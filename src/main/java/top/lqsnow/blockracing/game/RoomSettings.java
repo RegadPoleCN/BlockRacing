@@ -1,7 +1,6 @@
 package top.lqsnow.blockracing.game;
 
 import top.lqsnow.blockracing.managers.Config;
-import top.lqsnow.blockracing.managers.Setting;
 
 /** Settings of one game room. Values are seeded from config.yml when the room
  * is created and are written back to config.yml on change, mirroring the
@@ -16,7 +15,7 @@ public final class RoomSettings {
     private int maxTeamWaypointNum;
     private int maxRollCount;
     private boolean speedMode;
-    private Setting.GameMode gameMode = Setting.GameMode.NORMAL;
+    private GameModeType gameMode = GameModeType.NORMAL;
 
     public static RoomSettings fromConfig() {
         RoomSettings settings = new RoomSettings();
@@ -25,10 +24,10 @@ public final class RoomSettings {
     }
 
     /** Bare instance without config backing, for tests and programmatic rooms. */
-    public static RoomSettings fromRaw(int blockAmount, Setting.GameMode gameMode) {
+    public static RoomSettings fromRaw(int blockAmount, GameModeType gameMode) {
         RoomSettings settings = new RoomSettings();
         settings.blockAmount = blockAmount;
-        settings.gameMode = gameMode == null ? Setting.GameMode.NORMAL : gameMode;
+        settings.gameMode = gameMode == null ? GameModeType.NORMAL : gameMode;
         return settings;
     }
 
@@ -43,9 +42,9 @@ public final class RoomSettings {
         maxTeamWaypointNum = Math.max(1, Math.min(53, Config.MAX_TEAM_WAYPOINT_NUM.getInt()));
         maxRollCount = Math.max(0, Config.MAX_ROLL_COUNT.getInt());
         try {
-            gameMode = Setting.GameMode.valueOf(Config.GAME_MODE.getString().toUpperCase());
+            gameMode = GameModeType.valueOf(Config.GAME_MODE.getString().toUpperCase());
         } catch (IllegalArgumentException | NullPointerException ex) {
-            gameMode = Setting.GameMode.NORMAL;
+            gameMode = GameModeType.NORMAL;
         }
     }
 
@@ -85,7 +84,7 @@ public final class RoomSettings {
         return speedMode;
     }
 
-    public Setting.GameMode getGameMode() {
+    public GameModeType getGameMode() {
         return gameMode;
     }
 
@@ -119,7 +118,7 @@ public final class RoomSettings {
         Config.SPEED_MODE.setBoolean(value);
     }
 
-    public void setGameMode(Setting.GameMode value) {
+    public void setGameMode(GameModeType value) {
         gameMode = value;
         Config.GAME_MODE.setString(value.name().toLowerCase());
     }

@@ -3,7 +3,6 @@ package top.lqsnow.blockracing.game;
 import org.junit.jupiter.api.Test;
 
 import top.lqsnow.blockracing.core.TeamColor;
-import top.lqsnow.blockracing.managers.Setting;
 
 import java.util.HashSet;
 import java.util.List;
@@ -25,7 +24,7 @@ class BlockStateTest {
                 List.of());
     }
 
-    private static RoomSettings settings(int amount, Setting.GameMode mode) {
+    private static RoomSettings settings(int amount, GameModeType mode) {
         RoomSettings settings = RoomSettings.fromRaw(amount, mode);
         return settings;
     }
@@ -34,7 +33,7 @@ class BlockStateTest {
     void setupProducesRequestedAmountsForBothTeams() {
         BlockState blocks = new BlockState();
         BlockCatalog catalog = smallCatalog();
-        blocks.setup(settings(5, Setting.GameMode.NORMAL), catalog, new Random(42));
+        blocks.setup(settings(5, GameModeType.NORMAL), catalog, new Random(42));
 
         assertEquals(5, blocks.all(TeamColor.RED).size());
         assertEquals(5, blocks.all(TeamColor.BLUE).size());
@@ -45,9 +44,9 @@ class BlockStateTest {
     void setupOnlyUsesEnabledPool() {
         BlockState blocks = new BlockState();
         BlockCatalog catalog = smallCatalog();
-        Set<String> allowed = new HashSet<>(catalog.pool(settings(6, Setting.GameMode.NORMAL)));
+        Set<String> allowed = new HashSet<>(catalog.pool(settings(6, GameModeType.NORMAL)));
 
-        blocks.setup(settings(6, Setting.GameMode.NORMAL), catalog, new Random(7));
+        blocks.setup(settings(6, GameModeType.NORMAL), catalog, new Random(7));
 
         for (String block : blocks.all(TeamColor.RED)) {
             assertTrue(allowed.contains(block), "unexpected block " + block);
@@ -58,7 +57,7 @@ class BlockStateTest {
     void racingModeGivesIdenticalOrder() {
         BlockState blocks = new BlockState();
         BlockCatalog catalog = smallCatalog();
-        blocks.setup(settings(5, Setting.GameMode.RACING), catalog, new Random(42));
+        blocks.setup(settings(5, GameModeType.RACING), catalog, new Random(42));
 
         assertEquals(blocks.all(TeamColor.RED), blocks.all(TeamColor.BLUE));
     }
@@ -67,7 +66,7 @@ class BlockStateTest {
     void completeRemovesFromRemainingAndFinishesGame() {
         BlockState blocks = new BlockState();
         BlockCatalog catalog = smallCatalog();
-        blocks.setup(settings(2, Setting.GameMode.NORMAL), catalog, new Random(42));
+        blocks.setup(settings(2, GameModeType.NORMAL), catalog, new Random(42));
 
         List<String> remaining = List.copyOf(blocks.remaining(TeamColor.RED));
         for (String block : remaining) {
@@ -82,7 +81,7 @@ class BlockStateTest {
     void currentShowsUpToFourBlocks() {
         BlockState blocks = new BlockState();
         BlockCatalog catalog = smallCatalog();
-        blocks.setup(settings(6, Setting.GameMode.NORMAL), catalog, new Random(42));
+        blocks.setup(settings(6, GameModeType.NORMAL), catalog, new Random(42));
 
         assertEquals(4, blocks.current(TeamColor.RED).size());
         assertEquals(blocks.remaining(TeamColor.RED).subList(0, 4), blocks.current(TeamColor.RED));

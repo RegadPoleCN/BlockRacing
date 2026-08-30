@@ -11,7 +11,6 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import top.lqsnow.blockracing.Main;
-import top.lqsnow.blockracing.managers.Game;
 import top.lqsnow.blockracing.managers.Message;
 
 import java.util.List;
@@ -28,9 +27,15 @@ public class LocateBiome implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (Game.locateCommandPermission().contains(player.getName())) {
+        top.lqsnow.blockracing.core.GameInstance arena =
+                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player).orElse(null);
+        if (arena == null) {
+            player.sendMessage(Message.NOTICE_NOT_IN_GAME.getString(player));
+            return true;
+        }
+        if (arena.getLocatePermission().contains(player.getName())) {
             if (player.performCommand("locate biome " + args[0])) {
-                Game.locateCommandPermission().remove(player.getName());
+                arena.getLocatePermission().remove(player.getName());
                 player.addAttachment(Main.getInstance(), "minecraft.command.locate", false);
             }
         } else player.sendMessage(Message.NOTICE_LOCATE_NO_PERMISSION.getString(player));

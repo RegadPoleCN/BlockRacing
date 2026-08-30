@@ -18,9 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static top.lqsnow.blockracing.managers.Block.*;
-import static top.lqsnow.blockracing.managers.Game.*;
-
 public final class Scoreboard {
     private static final LegacyComponentSerializer LEGACY_SERIALIZER =
             LegacyComponentSerializer.legacySection();
@@ -41,37 +38,23 @@ public final class Scoreboard {
         sidebar = createSidebar(scoreboard);
     }
 
-    public static void setPreGameScoreboard() {
-        renderPreGame(scoreboard, sidebar, null);
-        PLAYER_BOARDS.forEach((uuid, view) -> {
-            Player player = Bukkit.getPlayer(uuid);
-            renderPreGame(view.scoreboard(), view.sidebar(), player);
-        });
-    }
-
-    public static void setInGameScoreboard() {
-        renderInGame(scoreboard, sidebar, null);
-        PLAYER_BOARDS.forEach((uuid, view) -> {
-            Player player = Bukkit.getPlayer(uuid);
-            renderInGame(view.scoreboard(), view.sidebar(), player);
-        });
-    }
-
     public static String getBlockDisplay(String block) {
         return getBlockDisplay(block, null);
     }
 
     public static String getBlockDisplay(String block, Player player) {
+        top.lqsnow.blockracing.game.BlockCatalog catalog =
+                top.lqsnow.blockracing.core.GameManager.first().getCatalog();
         Message difficulty;
-        if (Block.easyBlocks().contains(block)) {
+        if (catalog.getEasyBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_EASY;
-        } else if (Block.mediumBlocks().contains(block)) {
+        } else if (catalog.getMediumBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_MEDIUM;
-        } else if (Block.hardBlocks().contains(block)) {
+        } else if (catalog.getHardBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_HARD;
-        } else if (Block.dyedBlocks().contains(block)) {
+        } else if (catalog.getDyedBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_DYED;
-        } else if (Block.endBlocks().contains(block)) {
+        } else if (catalog.getEndBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_END;
         } else {
             return null;
@@ -171,7 +154,7 @@ public final class Scoreboard {
                 ? arena.getSettings()
                 : top.lqsnow.blockracing.core.GameManager.first().getSettings();
 
-        String baseMode = settings.getGameMode().equals(Setting.GameMode.NORMAL)
+        String baseMode = settings.getGameMode().equals(top.lqsnow.blockracing.game.GameModeType.NORMAL)
                 ? text(Message.SCOREBOARD_MODE_NORMAL, player)
                 : text(Message.SCOREBOARD_MODE_RACING, player);
         String displayedGameMode = settings.isSpeedMode()
@@ -254,10 +237,10 @@ public final class Scoreboard {
                 top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player).orElse(null);
         List<String> redEntries = arena != null
                 ? arena.getTeams().players(top.lqsnow.blockracing.core.TeamColor.RED)
-                : top.lqsnow.blockracing.managers.Team.redTeamPlayers();
+                : List.of();
         List<String> blueEntries = arena != null
                 ? arena.getTeams().players(top.lqsnow.blockracing.core.TeamColor.BLUE)
-                : top.lqsnow.blockracing.managers.Team.blueTeamPlayers();
+                : List.of();
         redEntries.forEach(red::addEntry);
         blueEntries.forEach(blue::addEntry);
         localizeTeam(red, Message.TEAM_RED_NAME, Message.TEAM_RED_PREFIX, player);

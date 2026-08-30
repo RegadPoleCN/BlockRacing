@@ -11,8 +11,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.RoomState;
 import top.lqsnow.blockracing.core.TeamColor;
-import top.lqsnow.blockracing.managers.Game;
 import top.lqsnow.blockracing.managers.Gui;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
@@ -20,8 +20,6 @@ import top.lqsnow.blockracing.menus.GameMenu;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static top.lqsnow.blockracing.managers.Game.*;
 
 public class Menu implements CommandExecutor, TabCompleter {
     @Override
@@ -31,11 +29,16 @@ public class Menu implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (Game.getCurrentGameState().equals(Game.GameState.END)) return true;
-
         GameInstance arena = GameManager.get().sessions().arenaOf(player).orElse(null);
         if (arena == null) {
-            player.sendMessage(Message.NOTICE_NOT_IN_GAME.getString(player));
+            if (args.length == 0 || (args.length == 1 && args[0].equalsIgnoreCase("main"))) {
+                Gui.openMenu(player);
+            } else {
+                player.sendMessage(Message.NOTICE_NOT_IN_GAME.getString(player));
+            }
+            return true;
+        }
+        if (arena.getState() == RoomState.ENDING || arena.getState() == RoomState.DISPOSED) {
             return true;
         }
 

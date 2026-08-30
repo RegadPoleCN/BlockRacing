@@ -6,14 +6,10 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.managers.Message;
-import top.lqsnow.blockracing.managers.GameProgressStore;
-import top.lqsnow.blockracing.managers.Setting;
-
-import static top.lqsnow.blockracing.managers.Game.*;
-import static top.lqsnow.blockracing.managers.Team.*;
-import static top.lqsnow.blockracing.utils.CommandUtil.sendBlue;
-import static top.lqsnow.blockracing.utils.CommandUtil.sendRed;
 
 public class WayPoint implements CommandExecutor {
     @Override
@@ -33,34 +29,26 @@ public class WayPoint implements CommandExecutor {
             player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
             return true;
         }
-        if (index < 1 || index > Setting.getMaxTeamWaypointNum()) {
+        GameInstance arena = GameManager.get().sessions().arenaOf(player).orElse(null);
+        if (arena == null) {
+            player.sendMessage(Message.NOTICE_NOT_IN_GAME.getString(player));
+            return true;
+        }
+        if (index < 1 || index > arena.getSettings().getMaxTeamWaypointNum()) {
             player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
             return true;
         }
-        if (args[0].equalsIgnoreCase("remove")) {
-            if (redTeamPlayers().contains(player.getName())) {
-                boolean flag = removeWaypoint("red", index);
-                if (!flag) return true;
-                sendRed(Message.NOTICE_RED_REMOVE_WAYPOINT, (viewer, text) -> text
-                        .replace("%player%", player.getName()).replace("%index%", String.valueOf(index)));
-            } else if (blueTeamPlayers().contains(player.getName())) {
-                boolean flag = removeWaypoint("blue", index);
-                if (!flag) return true;
-                sendBlue(Message.NOTICE_BLUE_REMOVE_WAYPOINT, (viewer, text) -> text
-                        .replace("%player%", player.getName()).replace("%index%", String.valueOf(index)));
-                }
-            }
-        return true;
-    }
-
-    private boolean removeWaypoint(String team, int index) {
-        if (team.equals("red")) {
-            redWaypoint().remove(index);
-        } else {
-            blueWaypoint().remove(index);
+        TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
+        if (team == null) {
+            player.sendMessage(Message.NOTICE_NOT_IN_GAME.getString(player));
+            return true;
         }
-        GameProgressStore.saveNow();
-
+        arena.waypoints(team).remove(index);
+        top.lqsnow.blockracing.game.InstanceProgressStore.saveNow(arena);
+        arena.broadcast().team(team,
+                team == TeamColor.RED ? Message.NOTICE_RED_REMOVE_WAYPOINT : Message.NOTICE_BLUE_REMOVE_WAYPOINT,
+                (viewer, text) -> text
+                        .replace("%player%", player.getName()).replace("%index%", String.valueOf(index)));
         return true;
     }
 }

@@ -88,27 +88,27 @@ public final class TeamChat {
     }
 
     private static String globalTeamPrefix(Player viewer, String playerName) {
-        Message prefix;
-        if (Team.redTeamPlayers().contains(playerName)) {
-            prefix = Message.TEAM_RED_PREFIX;
-        } else if (Team.blueTeamPlayers().contains(playerName)) {
-            prefix = Message.TEAM_BLUE_PREFIX;
-        } else {
+        TeamColor team = teamOf(playerName);
+        if (team == null) {
             return "&7[--]";
         }
+        Message prefix = team == TeamColor.RED ? Message.TEAM_RED_PREFIX : Message.TEAM_BLUE_PREFIX;
         return viewer == null ? prefix.getString() : prefix.getString(viewer);
     }
 
     private static String globalPlayerName(Player viewer, String playerName) {
-        Message color;
-        if (Team.redTeamPlayers().contains(playerName)) {
-            color = Message.TEAM_RED_COLOR;
-        } else if (Team.blueTeamPlayers().contains(playerName)) {
-            color = Message.TEAM_BLUE_COLOR;
-        } else {
+        TeamColor team = teamOf(playerName);
+        if (team == null) {
             return "&7" + playerName;
         }
+        Message color = team == TeamColor.RED ? Message.TEAM_RED_COLOR : Message.TEAM_BLUE_COLOR;
         return (viewer == null ? color.getString() : color.getString(viewer)) + playerName;
+    }
+
+    private static TeamColor teamOf(String playerName) {
+        return GameManager.get().sessions().arenaOf(playerName)
+                .map(arena -> arena.getTeams().teamOf(playerName).orElse(null))
+                .orElse(null);
     }
 
     static int globalPrefixLength(String message) {

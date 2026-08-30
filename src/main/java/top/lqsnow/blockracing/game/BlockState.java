@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Random;
 
 import top.lqsnow.blockracing.core.TeamColor;
-import top.lqsnow.blockracing.managers.Setting;
 
 /** Per-game target block assignment and remaining progress. */
 public final class BlockState {
@@ -21,7 +20,7 @@ public final class BlockState {
         blueRemaining.clear();
 
         List<String> pool = catalog.pool(settings);
-        if (settings.getGameMode() == Setting.GameMode.NORMAL) {
+        if (settings.getGameMode() == GameModeType.NORMAL) {
             redAll.addAll(generateBlocks(settings, catalog, pool, random));
             blueAll.addAll(generateBlocks(settings, catalog, pool, random));
         } else {

@@ -9,14 +9,13 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import top.lqsnow.blockracing.managers.Game;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.managers.Gui;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
-import top.lqsnow.blockracing.managers.Team;
 import top.lqsnow.blockracing.menus.PreGameMenu;
 import top.lqsnow.blockracing.toolkit.text.Texts;
-import top.lqsnow.blockracing.utils.CommandUtil;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,8 +25,6 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-
-import static top.lqsnow.blockracing.managers.Game.getCurrentGameState;
 
 public class RandomTeam implements CommandExecutor {
     private static final long CONFIRM_TIMEOUT_MILLIS = 30_000;
@@ -40,7 +37,7 @@ public class RandomTeam implements CommandExecutor {
             Bukkit.getLogger().info("This command can only be run by a player.");
             return true;
         }
-        if (!getCurrentGameState().equals(Game.GameState.PREGAME)) {
+        if (!isWaitingArena(player)) {
             player.sendMessage(Message.NOTICE_GAME_HAS_START.getString(player));
             return true;
         }
@@ -59,7 +56,7 @@ public class RandomTeam implements CommandExecutor {
     }
 
     public static void requestConfirmation(Player player) {
-        if (!getCurrentGameState().equals(Game.GameState.PREGAME)) {
+        if (!isWaitingArena(player)) {
             player.sendMessage(Message.NOTICE_GAME_HAS_START.getString(player));
             return;
         }
@@ -87,7 +84,7 @@ public class RandomTeam implements CommandExecutor {
 
         top.lqsnow.blockracing.core.GameInstance arena = top.lqsnow.blockracing.core.GameManager.get()
                 .sessions().arenaOf(player).orElse(top.lqsnow.blockracing.core.GameManager.first());
-        List<List<Player>> teams = splitPlayers(Bukkit.getOnlinePlayers(), new Random());
+        List<List<Player>> teams = splitPlayers(arena.arenaPlayers(), new Random());
         arena.getTeams().clear();
         teams.get(0).forEach(member -> arena.getTeams().add(member.getName(),
                 top.lqsnow.blockracing.core.TeamColor.RED));
@@ -95,7 +92,7 @@ public class RandomTeam implements CommandExecutor {
                 top.lqsnow.blockracing.core.TeamColor.BLUE));
         Scoreboard.syncPlayerTeams();
 
-        CommandUtil.sendAll(Message.NOTICE_TEAM_SHUFFLE_TRIGGERED,
+        arena.broadcast().all(Message.NOTICE_TEAM_SHUFFLE_TRIGGERED,
                 (viewer, text) -> text.replace("%player%", player.getName()));
         Gui.updateMenu(new PreGameMenu(arena));
         Scoreboard.updateScoreboard();
@@ -111,5 +108,11 @@ public class RandomTeam implements CommandExecutor {
         return random.nextBoolean()
                 ? List.of(first, second)
                 : List.of(second, first);
+    }
+
+    private static boolean isWaitingArena(Player player) {
+        return GameManager.get().sessions().arenaOf(player)
+                .map(arena -> arena.getState() == top.lqsnow.blockracing.core.RoomState.WAITING)
+                .orElse(false);
     }
 }

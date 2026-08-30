@@ -8,9 +8,9 @@ import top.lqsnow.blockracing.commands.RandomTeam;
 import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.core.TeamColor;
+import top.lqsnow.blockracing.game.GameModeType;
 import top.lqsnow.blockracing.game.RoomSettings;
 import top.lqsnow.blockracing.managers.Message;
-import top.lqsnow.blockracing.managers.Setting;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.menu.MenuButton;
 import top.lqsnow.blockracing.toolkit.menu.MenuView;
@@ -74,11 +74,11 @@ public final class PreGameMenu extends MenuView {
                 }
         ));
         setButton(29, MenuButton.of(this::normalModeItem, (player, click) -> {
-            settings.setGameMode(Setting.GameMode.NORMAL);
+            settings.setGameMode(GameModeType.NORMAL);
             refreshSettings();
         }));
         setButton(30, MenuButton.of(this::racingModeItem, (player, click) -> {
-            settings.setGameMode(Setting.GameMode.RACING);
+            settings.setGameMode(GameModeType.RACING);
             refreshSettings();
         }));
         setButton(33, MenuButton.of(
@@ -168,7 +168,7 @@ public final class PreGameMenu extends MenuView {
     }
 
     private ItemStack normalModeItem(Player player) {
-        boolean selected = arena.getSettings().getGameMode() == Setting.GameMode.NORMAL;
+        boolean selected = arena.getSettings().getGameMode() == GameModeType.NORMAL;
         return ItemBuilder.of(selected ? Material.GREEN_CONCRETE : Material.YELLOW_CONCRETE)
                 .name((selected ? Message.MENU_CURRENT_MODE : Message.MENU_SWITCH_TO).getString(player)
                         + Message.MENU_NORMAL_MODE.getString(player))
@@ -177,7 +177,7 @@ public final class PreGameMenu extends MenuView {
     }
 
     private ItemStack racingModeItem(Player player) {
-        boolean selected = arena.getSettings().getGameMode() == Setting.GameMode.RACING;
+        boolean selected = arena.getSettings().getGameMode() == GameModeType.RACING;
         return ItemBuilder.of(selected ? Material.GREEN_CONCRETE : Material.YELLOW_CONCRETE)
                 .name((selected ? Message.MENU_CURRENT_MODE : Message.MENU_SWITCH_TO).getString(player)
                         + Message.MENU_RACING_MODE.getString(player))

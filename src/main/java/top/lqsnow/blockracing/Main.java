@@ -4,7 +4,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import top.lqsnow.blockracing.commands.*;
 import top.lqsnow.blockracing.core.GameManager;
-import top.lqsnow.blockracing.listeners.BasicListener;
+import top.lqsnow.blockracing.core.RoomState;
+import top.lqsnow.blockracing.game.InstanceProgressStore;
+import top.lqsnow.blockracing.listeners.ArenaListener;
 import top.lqsnow.blockracing.managers.*;
 import top.lqsnow.blockracing.toolkit.menu.MenuListener;
 import top.lqsnow.blockracing.world.ArenaWorldService;
@@ -29,7 +31,7 @@ public class Main extends JavaPlugin {
         instance = this;
 
         // Register events
-        getPluginManager().registerEvents(new BasicListener(), this);
+        getPluginManager().registerEvents(new ArenaListener(), this);
         getPluginManager().registerEvents(new MenuListener(), this);
         getPluginManager().registerEvents(new top.lqsnow.blockracing.lobby.LobbyListener(), this);
 
@@ -78,18 +80,15 @@ public class Main extends JavaPlugin {
         ArenaWorldService.init();
         GameManager.init();
         GameManager.get().createGame();
-        Team.createTeam();
         Scoreboard.createScoreboard();
-        Block.checkBlock();
-        Block.refreshAvailableBlocksAndClampAmount();
-        boolean recoveredGame = GameProgressStore.load();
+        GameManager.first().validateBlocks();
+        GameManager.first().refreshAvailableBlocksAndClampAmount();
+        boolean recoveredGame = InstanceProgressStore.load(GameManager.first());
         if (recoveredGame) {
-            Game.resumeRecoveredGame();
-            Scoreboard.setInGameScoreboard();
-        } else {
-            Scoreboard.setPreGameScoreboard();
+            GameManager.first().resumeRecovered();
         }
-        GameProgressStore.startAutosave();
+        Scoreboard.updateScoreboard();
+        InstanceProgressStore.startAutosave();
         // Runs after recovery so a world adopted by recovery is not treated as an orphan.
         ArenaWorldService.get().cleanupOrphansAndPruneBackups(
                 Config.WORLD_PREFIX.getString(), Config.BACKUP_KEEP.getInt());
@@ -103,10 +102,14 @@ public class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        if (Game.getCurrentGameState() == Game.GameState.INGAME) {
-            GameProgressStore.saveNow();
+        boolean anyRunning = GameManager.get().all().stream()
+                .anyMatch(arena -> arena.getState() == RoomState.RUNNING);
+        if (anyRunning) {
+            GameManager.get().all().stream()
+                    .filter(arena -> arena.getState() == RoomState.RUNNING)
+                    .forEach(InstanceProgressStore::saveNow);
         } else {
-            GameProgressStore.clear();
+            InstanceProgressStore.clear();
         }
         Config.saveConfig();
     }

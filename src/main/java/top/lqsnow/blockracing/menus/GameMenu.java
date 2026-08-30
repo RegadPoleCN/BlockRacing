@@ -9,7 +9,7 @@ import org.bukkit.inventory.meta.SkullMeta;
 import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.core.TeamColor;
-import top.lqsnow.blockracing.managers.GameProgressStore;
+import top.lqsnow.blockracing.game.InstanceProgressStore;
 import top.lqsnow.blockracing.managers.LanguageManager;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
@@ -166,7 +166,7 @@ public final class GameMenu extends MenuView {
                                     : Message.TEAM_BLUE_COLOR.getString(viewer)) + player.getName()));
         }
         Scoreboard.updateScoreboard();
-        GameProgressStore.saveNow();
+        InstanceProgressStore.saveNow(arena);
     }
 
     public static final class TeamChestSelectMenu extends MenuView {

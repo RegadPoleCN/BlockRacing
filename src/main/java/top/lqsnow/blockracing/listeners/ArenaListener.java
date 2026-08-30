@@ -6,42 +6,48 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.*;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerLocaleChangeEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import top.lqsnow.blockracing.Main;
-import top.lqsnow.blockracing.managers.*;
-import top.lqsnow.blockracing.menus.PreGameMenu;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.RoomState;
+import top.lqsnow.blockracing.managers.Message;
+import top.lqsnow.blockracing.managers.Scoreboard;
+import top.lqsnow.blockracing.managers.TeamChat;
 import top.lqsnow.blockracing.menus.LanguageMenu;
+import top.lqsnow.blockracing.menus.PreGameMenu;
 
-import java.util.List;
+import java.util.Optional;
 
 import static top.lqsnow.blockracing.managers.Gui.updateMenu;
 import static top.lqsnow.blockracing.managers.Scoreboard.updateScoreboard;
-import static top.lqsnow.blockracing.managers.Team.isPlayerInBlueTeam;
-import static top.lqsnow.blockracing.managers.Team.isPlayerInRedTeam;
-import static top.lqsnow.blockracing.managers.Block.*;
-import static top.lqsnow.blockracing.utils.CommandUtil.sendAll;
 
-public class BasicListener implements Listener {
+/** Player lifecycle events routed through the session manager. Lobby-world
+ * protection lives in {@link top.lqsnow.blockracing.lobby.LobbyListener}. */
+public class ArenaListener implements Listener {
     private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.legacySection();
 
     private static java.util.Set<String> editAmountPlayers() {
-        return top.lqsnow.blockracing.core.GameManager.get().sessions().getEditAmountPlayers();
+        return GameManager.get().sessions().getEditAmountPlayers();
     }
 
     @EventHandler
     private void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        java.util.Optional<top.lqsnow.blockracing.core.GameInstance> arena =
-                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player);
+        Optional<GameInstance> arena = GameManager.get().sessions().arenaOf(player);
         if (arena.isPresent()) {
             // Rejoin (also mid-game); the arena keeps the binding across disconnects.
             arena.get().playerLogin(player);
         } else {
             top.lqsnow.blockracing.lobby.Lobby.get().joinAsFirst(player);
         }
-        if (LanguageManager.registerFirstJoin(player)) {
+        if (top.lqsnow.blockracing.managers.LanguageManager.registerFirstJoin(player)) {
             LanguageMenu.sendFirstJoinPrompt(player);
         }
     }
@@ -49,8 +55,8 @@ public class BasicListener implements Listener {
     @EventHandler
     private void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player)
-                .ifPresent(arena -> arena.playerQuit(player));
+        GameManager.get().sessions().arenaOf(player)
+                .ifPresent(a -> a.playerQuit(player));
         Scoreboard.removePlayer(player);
     }
 
@@ -65,9 +71,10 @@ public class BasicListener implements Listener {
         // Open menu
         if (event.getPlayer().isSneaking()) {
             event.setCancelled(true);
-            Gui.openMenu(event.getPlayer());
+            top.lqsnow.blockracing.managers.Gui.openMenu(event.getPlayer());
         }
     }
+
     @EventHandler
     private void onPlayerChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
@@ -85,7 +92,8 @@ public class BasicListener implements Listener {
 
     private void handleBlockAmountInput(Player player, String message) {
         if (!editAmountPlayers().contains(player.getName())) return;
-        if (!Game.getCurrentGameState().equals(Game.GameState.PREGAME)) {
+        Optional<GameInstance> arena = GameManager.get().sessions().arenaOf(player);
+        if (arena.isEmpty() || arena.get().getState() != RoomState.WAITING) {
             editAmountPlayers().remove(player.getName());
             return;
         }
@@ -106,26 +114,28 @@ public class BasicListener implements Listener {
     private void onPlayerRespawn(PlayerRespawnEvent event) {
         event.getPlayer().sendMessage(Message.NOTICE_SPAWN_PROTECT.getString(event.getPlayer()));
         Bukkit.getScheduler().runTaskLater(Main.getInstance(), () -> {
-            event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, -1, 0, false, false));
-            if (Game.getCurrentGameState().equals(Game.GameState.INGAME) && Setting.isSpeedMode()) event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.HASTE, -1, 4, false, false));
-            event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.SPEED, -1, 1, false, false));
-            event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, -1, 1, false, false));
+            Player player = event.getPlayer();
+            player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, -1, 0, false, false));
+            GameInstance arena = GameManager.get().sessions().arenaOf(player).orElse(null);
+            if (arena != null && arena.getState() == RoomState.RUNNING && arena.getSettings().isSpeedMode()) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, -1, 4, false, false));
+            }
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, -1, 1, false, false));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, -1, 1, false, false));
         }, 10L);
     }
 
     public static void setBlockAmount(Player player, int blockAmount, Boolean sendMessage) {
-        top.lqsnow.blockracing.core.GameInstance arena =
-                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player)
-                        .orElse(top.lqsnow.blockracing.core.GameManager.first());
-        blockAmount = Block.clampBlockAmount(blockAmount,
+        GameInstance arena = GameManager.get().sessions().arenaOf(player).orElse(GameManager.first());
+        blockAmount = top.lqsnow.blockracing.game.BlockCatalog.clampBlockAmount(blockAmount,
                 arena.getCatalog().maxBlockAmount(arena.getSettings()));
         if (sendMessage) {
             int finalBlockAmount = blockAmount;
-            sendAll(Message.NOTICE_SET_BLOCKS_SUCCESS,
+            arena.broadcast().all(Message.NOTICE_SET_BLOCKS_SUCCESS,
                     (viewer, text) -> text + finalBlockAmount);
         }
         arena.getSettings().setBlockAmount(blockAmount);
-        Gui.updateMenu(new PreGameMenu(arena));
+        updateMenu(new PreGameMenu(arena));
         updateScoreboard();
     }
 }

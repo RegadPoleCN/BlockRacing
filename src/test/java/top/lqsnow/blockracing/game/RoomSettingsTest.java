@@ -2,7 +2,7 @@ package top.lqsnow.blockracing.game;
 
 import org.junit.jupiter.api.Test;
 
-import top.lqsnow.blockracing.managers.Setting;
+import top.lqsnow.blockracing.game.GameModeType;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -12,9 +12,9 @@ class RoomSettingsTest {
 
     @Test
     void rawFactoryKeepsExactValues() {
-        RoomSettings settings = RoomSettings.fromRaw(2, Setting.GameMode.RACING);
+        RoomSettings settings = RoomSettings.fromRaw(2, GameModeType.RACING);
         assertEquals(2, settings.getBlockAmount());
-        assertEquals(Setting.GameMode.RACING, settings.getGameMode());
+        assertEquals(GameModeType.RACING, settings.getGameMode());
         assertFalse(settings.isSpeedMode());
         assertFalse(settings.isEnableMediumBlock());
     }
@@ -22,6 +22,6 @@ class RoomSettingsTest {
     @Test
     void gameModeDefaultsToNormal() {
         RoomSettings settings = RoomSettings.fromRaw(10, null);
-        assertEquals(Setting.GameMode.NORMAL, settings.getGameMode());
+        assertEquals(GameModeType.NORMAL, settings.getGameMode());
     }
 }

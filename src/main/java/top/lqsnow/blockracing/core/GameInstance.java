@@ -48,10 +48,10 @@ import top.lqsnow.blockracing.game.RandomTeleportService;
 import top.lqsnow.blockracing.game.RoomSettings;
 import top.lqsnow.blockracing.game.TeamState;
 import top.lqsnow.blockracing.managers.Config;
-import top.lqsnow.blockracing.managers.GameProgressStore;
+import top.lqsnow.blockracing.game.GameModeType;
+import top.lqsnow.blockracing.game.InstanceProgressStore;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
-import top.lqsnow.blockracing.managers.Setting;
 import top.lqsnow.blockracing.session.SessionManager;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.material.Materials;
@@ -146,7 +146,7 @@ public class GameInstance {
                     .map(line -> line.replace("%player%", player.getName()))
                     .forEach(player::sendMessage);
         } else if (state == RoomState.RUNNING) {
-            if (GameProgressStore.hasRecoveredGame()) {
+            if (InstanceProgressStore.hasRecoveredGame()) {
                 Message.NOTICE_RECOVERED_GAME.getStringList(player).forEach(player::sendMessage);
             }
             // Spectator
@@ -234,7 +234,7 @@ public class GameInstance {
             readyPlayers.add(player.getName());
             broadcast.all(Message.NOTICE_READY, (viewer, text) -> text.replace("%player%", player.getName()));
             // Check if the game can start, just notice players
-            if (readyPlayers.size() > 1 && readyPlayers.size() == Bukkit.getOnlinePlayers().size()) {
+            if (readyPlayers.size() > 1 && readyPlayers.size() == arenaPlayers().size()) {
                 broadcast.all(Message.NOTICE_ALL_READY);
             }
         } else {
@@ -250,7 +250,7 @@ public class GameInstance {
         if (!Config.AUTO_START.getBoolean() || state != RoomState.WAITING) {
             return;
         }
-        int online = Bukkit.getOnlinePlayers().size();
+        int online = arenaPlayers().size();
         if (online < Math.max(1, Config.MIN_PLAYERS.getInt())) {
             return;
         }
@@ -265,9 +265,18 @@ public class GameInstance {
     }
 
     public int playerCount() {
-        return (int) Bukkit.getOnlinePlayers().stream()
-                .filter(player -> sessions.arenaOf(player).map(a -> a == this).orElse(false))
-                .count();
+        return arenaPlayers().size();
+    }
+
+    /** Online players whose session points at this arena. */
+    public List<Player> arenaPlayers() {
+        List<Player> players = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (sessions.arenaOf(player).map(a -> a == this).orElse(false)) {
+                players.add(player);
+            }
+        }
+        return players;
     }
 
     // Check if the game can start. If not, send the reason to the player; if
@@ -278,13 +287,13 @@ public class GameInstance {
             return;
 
         // Not enough players
-        if (!(Bukkit.getOnlinePlayers().size() > 1)) {
+        if (!(arenaPlayers().size() > 1)) {
             player.sendMessage(Message.NOTICE_NOT_ENOUGH_PLAYERS.getString(player));
             return;
         }
 
         // Exist unready players
-        if (!(readyPlayers.size() == Bukkit.getOnlinePlayers().size())) {
+        if (!(readyPlayers.size() == arenaPlayers().size())) {
             List<String> unreadyPlayers = getOnlinePlayerNames();
             unreadyPlayers.removeAll(readyPlayers);
             player.sendMessage(Message.NOTICE_EXIST_UNREADY.getString(player));
@@ -312,7 +321,7 @@ public class GameInstance {
         // Init
         state = RoomState.RUNNING;
         startedAt = System.currentTimeMillis();
-        GuiBridge.closeAllPlayersMenu();
+        arenaPlayers().forEach(Player::closeInventory);
         sessions.getEditAmountPlayers().clear();
         blockState.setup(settings, catalog, new Random());
         Bukkit.getLogger().info("[BlockRacing] Blocks generate complete.");
@@ -322,7 +331,8 @@ public class GameInstance {
         blueTotalBlockAmount = blockState.all(TeamColor.BLUE).size();
         setLocateCost();
         Scoreboard.updateScoreboard();
-        Bukkit.getOnlinePlayers().forEach((Player player) -> freeRandomTp.add(player.getName()));
+        List<Player> starting = arenaPlayers();
+        starting.forEach(player -> freeRandomTp.add(player.getName()));
         tickTask = new RunPer5Tick().runTaskTimer(Main.getInstance(), 0L, 5L);
         if (world == null) {
             world = top.lqsnow.blockracing.world.ArenaWorldService.get()
@@ -340,8 +350,9 @@ public class GameInstance {
         world.getWorldBorder().setSize(59999968);
 
         // Processing of unselected team players (spectators)
-        inGamePlayers.addAll(getOnlinePlayerNames());
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        inGamePlayers.clear();
+        starting.forEach(player -> inGamePlayers.add(player.getName()));
+        for (Player player : starting) {
             if (!teams.contains(player.getName())) {
                 player.setGameMode(GameMode.SPECTATOR);
                 player.teleport(world.getSpawnLocation());
@@ -358,12 +369,12 @@ public class GameInstance {
 
         Bukkit.getLogger().info("Red team players: " + teams.players(TeamColor.RED));
         Bukkit.getLogger().info("Blue team players: " + teams.players(TeamColor.BLUE));
-        if (settings.getGameMode() == Setting.GameMode.NORMAL)
+        if (settings.getGameMode() == GameModeType.NORMAL)
             Bukkit.getLogger().info("Game mode: Normal");
-        else if (settings.getGameMode() == Setting.GameMode.RACING)
+        else if (settings.getGameMode() == GameModeType.RACING)
             Bukkit.getLogger().info("Game mode: Racing");
         Bukkit.getLogger().info(settings.isSpeedMode() ? "Speed mode: On" : "Speed mode: Off");
-        GameProgressStore.saveNow();
+        InstanceProgressStore.saveNow(this);
     }
 
     // Player init
@@ -452,7 +463,7 @@ public class GameInstance {
             locatePermission.add(player.getName());
             broadcast.all(Message.NOTICE_BUY_LOCATE, (viewer, text) -> text.replace("%player%", player.getName()));
             player.addAttachment(Main.getInstance(), "minecraft.command.locate", true);
-            GameProgressStore.saveNow();
+            InstanceProgressStore.saveNow(this);
         } else {
             player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
         }
@@ -488,7 +499,7 @@ public class GameInstance {
                         ? Message.TEAM_RED_NAME.getString(viewer)
                         : Message.TEAM_BLUE_NAME.getString(viewer)));
         Scoreboard.updateScoreboard();
-        GameProgressStore.saveNow();
+        InstanceProgressStore.saveNow(this);
     }
 
     private String rollLimitMessage(Player player) {
@@ -635,7 +646,7 @@ public class GameInstance {
     public void setWaypoint(Player player, TeamColor team, int index) {
         Location waypoint = player.getLocation();
         waypoints(team).put(index, waypoint);
-        GameProgressStore.saveNow();
+        InstanceProgressStore.saveNow(this);
     }
 
     private void removeWaypoint(Player player, TeamColor team, int index) {
@@ -651,7 +662,7 @@ public class GameInstance {
     private class RunPer2Tick extends BukkitRunnable {
         @Override
         public void run() {
-            for (Player player : Bukkit.getOnlinePlayers()) {
+            for (Player player : arenaPlayers()) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 10, 255));
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SATURATION, 10, 255));
             }
@@ -722,7 +733,7 @@ public class GameInstance {
             addRollCount(team);
             rollPlayers(team).clear();
             Scoreboard.updateScoreboard();
-            GameProgressStore.saveNow();
+            InstanceProgressStore.saveNow(this);
         }
     }
 
@@ -788,7 +799,7 @@ public class GameInstance {
         collect(player);
         Scoreboard.updateScoreboard();
         // Put items into the opponent's team chest
-        if (settings.getGameMode() == Setting.GameMode.NORMAL) {
+        if (settings.getGameMode() == GameModeType.NORMAL) {
             List<Inventory> opponentChests = chests(team.opponent());
             for (int i = opponentChests.size() - 1; i >= 0; i--) {
                 Inventory chest = opponentChests.get(i);
@@ -797,7 +808,7 @@ public class GameInstance {
                     continue;
                 }
                 chest.setItem(emptyPos, Materials.stack(block, 64));
-                GameProgressStore.saveNow();
+                InstanceProgressStore.saveNow(this);
                 return;
             }
             Message opponentName = team == TeamColor.RED ? Message.TEAM_BLUE_NAME : Message.TEAM_RED_NAME;
@@ -805,7 +816,7 @@ public class GameInstance {
                     .replace("%team%", opponentName.getString(viewer))
                     .replace("%block%", TranslationUtil.getValue(block, viewer)));
         }
-        GameProgressStore.saveNow();
+        InstanceProgressStore.saveNow(this);
     }
 
     private Message teamChestLabel(TeamColor team) {
@@ -814,7 +825,7 @@ public class GameInstance {
 
     public void end(TeamColor winner) {
         Message winNotice = winner == TeamColor.RED ? Message.NOTICE_RED_WIN : Message.NOTICE_BLUE_WIN;
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        for (Player player : arenaPlayers()) {
             player.closeInventory();
             player.showTitle(Title.title(
                     LEGACY_SERIALIZER.deserialize(winNotice.getString(player)),
@@ -825,7 +836,7 @@ public class GameInstance {
         broadcast.all(winNotice);
         broadcast.sound(Sound.UI_TOAST_CHALLENGE_COMPLETE);
         state = RoomState.ENDING;
-        GameProgressStore.clear();
+        InstanceProgressStore.clear();
         GameManager.get().scheduleDispose(this);
     }
 
@@ -835,14 +846,12 @@ public class GameInstance {
             return;
         }
         Bukkit.getLogger().warning("[BlockRacing] Game " + id + " exceeded the time limit and was force-ended.");
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (sessions.arenaOf(player).map(a -> a == this).orElse(false)) {
-                player.closeInventory();
-                player.setGameMode(GameMode.SPECTATOR);
-            }
+        for (Player player : arenaPlayers()) {
+            player.closeInventory();
+            player.setGameMode(GameMode.SPECTATOR);
         }
         state = RoomState.ENDING;
-        GameProgressStore.clear();
+        InstanceProgressStore.clear();
         GameManager.get().scheduleDispose(this);
     }
 
@@ -1095,12 +1104,5 @@ public class GameInstance {
 
     public List<String> getInGamePlayers() {
         return inGamePlayers;
-    }
-
-    /** Indirection so GameInstance does not depend on the managers.Gui facade. */
-    private static final class GuiBridge {
-        static void closeAllPlayersMenu() {
-            Bukkit.getOnlinePlayers().forEach(Player::closeInventory);
-        }
     }
 }

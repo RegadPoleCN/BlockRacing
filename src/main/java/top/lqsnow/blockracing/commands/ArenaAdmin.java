@@ -14,7 +14,6 @@ import org.jetbrains.annotations.Nullable;
 import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.core.RoomState;
-import top.lqsnow.blockracing.managers.Game;
 
 /** Admin operations on arenas: /bradmin <start|stop> */
 public class ArenaAdmin implements CommandExecutor, TabCompleter {
