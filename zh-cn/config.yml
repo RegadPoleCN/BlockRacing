@@ -38,5 +38,10 @@ max-team-waypoint-num: 8
 # 该项仅供服务器管理员修改，不会出现在准备菜单中
 max-roll-count: 3
 
+# 服务器重启后是否恢复上一局未完成的游戏进度
+# 公开服务器建议关闭：游戏结束后世界会自动回收
+recovery:
+  enabled: true
+
 # 内部兼容版本，请勿手动修改
 config-version: 26.2.1

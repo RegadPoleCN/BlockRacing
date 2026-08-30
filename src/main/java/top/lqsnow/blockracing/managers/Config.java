@@ -22,7 +22,8 @@ public enum Config {
     CONFIG_VERSION("config-version"),
     MAX_TEAM_CHEST_NUM("max-team-chest-num"),
     MAX_TEAM_WAYPOINT_NUM("max-team-waypoint-num"),
-    MAX_ROLL_COUNT("max-roll-count");
+    MAX_ROLL_COUNT("max-roll-count"),
+    RECOVERY_ENABLED("recovery.enabled");
 
     private static File file;
     private static FileConfiguration config;

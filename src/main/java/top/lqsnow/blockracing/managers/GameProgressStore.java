@@ -43,6 +43,10 @@ public final class GameProgressStore {
 
     public static boolean load() {
         file = new File(Main.getInstance().getDataFolder(), "game-progress.yml");
+        if (!Config.RECOVERY_ENABLED.getBoolean()) {
+            clear();
+            return false;
+        }
         if (!file.isFile()) {
             return false;
         }

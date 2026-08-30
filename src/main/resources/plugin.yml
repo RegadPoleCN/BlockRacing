@@ -30,6 +30,7 @@ commands:
   block:
     usage: "/block <team> <number>"
     description: "Query block."
+    permission: blockracing.admin
   randomteam:
     usage: "/randomteam [confirm]"
     description: "Request or confirm balanced random teams."
@@ -41,3 +42,10 @@ commands:
     aliases: [lang]
     usage: "/language [auto|zh_cn|en_us]"
     description: "Select your display language."
+permissions:
+  blockracing.user:
+    default: true
+  blockracing.admin:
+    default: op
+    children:
+      blockracing.user: true

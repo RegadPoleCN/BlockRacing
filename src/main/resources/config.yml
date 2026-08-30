@@ -37,5 +37,10 @@ max-team-waypoint-num: 8
 # This is an administrator setting and is not exposed in the preparation menu.
 max-roll-count: 3
 
+# Whether to restore an unfinished game after a server restart.
+# Keep this disabled on public servers where finished games recycle automatically.
+recovery:
+  enabled: true
+
 # Internal compatibility value. Do not edit this manually.
 config-version: 26.2.1
