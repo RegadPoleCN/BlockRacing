@@ -1,22 +1,44 @@
 package top.lqsnow.blockracing.managers;
 
+import java.util.HashSet;
+import java.util.List;
+
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.TeamColor;
 
 import static top.lqsnow.blockracing.managers.Scoreboard.scoreboard;
 import static top.lqsnow.blockracing.utils.CommandUtil.sendAll;
 
+/**
+ * Transitional facade: team membership lives in the instance's
+ * {@link top.lqsnow.blockracing.game.TeamState}; scoreboard registration
+ * stays here.
+ */
+@Deprecated
 public class Team {
     private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.legacySection();
     public static org.bukkit.scoreboard.Team redTeam = scoreboard.registerNewTeam("red");
     public static org.bukkit.scoreboard.Team blueTeam = scoreboard.registerNewTeam("blue");
-    public static List<String> redTeamPlayers = new CopyOnWriteArrayList<>();
-    public static List<String> blueTeamPlayers = new CopyOnWriteArrayList<>();
+
+    private Team() {
+    }
+
+    private static GameInstance arena() {
+        return GameManager.first();
+    }
+
+    public static List<String> redTeamPlayers() {
+        return arena().getTeams().players(TeamColor.RED);
+    }
+
+    public static List<String> blueTeamPlayers() {
+        return arena().getTeams().players(TeamColor.BLUE);
+    }
 
     public static void createTeam() {
         redTeam.displayName(LEGACY_SERIALIZER.deserialize(Message.TEAM_RED_NAME.getString()));
@@ -29,73 +51,53 @@ public class Team {
     }
 
     public static boolean joinTeam(Player player, org.bukkit.scoreboard.Team team, boolean sendMessage) {
-        if (team.equals(redTeam)) {
-            if (redTeamPlayers.contains(player.getName())) {
-                if (sendMessage) {
-                    player.sendMessage(Message.NOTICE_ALREADY_IN_RED.getString(player));
-                }
-                return false;
-            }
-            if (blueTeamPlayers.contains(player.getName())) {
-                blueTeam.removeEntry(player.getName());
-                blueTeamPlayers.remove(player.getName());
-            }
-            redTeam.addEntry(player.getName());
-            redTeamPlayers.add(player.getName());
-            Scoreboard.syncPlayerTeams();
+        TeamColor color = team.equals(redTeam) ? TeamColor.RED : TeamColor.BLUE;
+        List<String> members = arena().getTeams().players(color);
+        List<String> otherMembers = arena().getTeams().players(color.opponent());
+        if (members.contains(player.getName())) {
             if (sendMessage) {
-                sendAll(Message.NOTICE_JOIN_RED,
-                        (viewer, text) -> text.replace("%player%", player.getName()));
+                player.sendMessage(color == TeamColor.RED
+                        ? Message.NOTICE_ALREADY_IN_RED.getString(player)
+                        : Message.NOTICE_ALREADY_IN_BLUE.getString(player));
             }
+            return false;
         }
-        else if (team.equals(blueTeam)) {
-            if (blueTeamPlayers.contains(player.getName())) {
-                if (sendMessage) {
-                    player.sendMessage(Message.NOTICE_ALREADY_IN_BLUE.getString(player));
-                }
-                return false;
-            }
-            if (redTeamPlayers.contains(player.getName())) {
-                redTeam.removeEntry(player.getName());
-                redTeamPlayers.remove(player.getName());
-            }
-            blueTeam.addEntry(player.getName());
-            blueTeamPlayers.add(player.getName());
-            Scoreboard.syncPlayerTeams();
-            if (sendMessage) {
-                sendAll(Message.NOTICE_JOIN_BLUE,
-                        (viewer, text) -> text.replace("%player%", player.getName()));
-            }
+        if (otherMembers.contains(player.getName())) {
+            org.bukkit.scoreboard.Team otherTeam = color == TeamColor.RED ? blueTeam : redTeam;
+            otherTeam.removeEntry(player.getName());
+            otherMembers.remove(player.getName());
+        }
+        team.addEntry(player.getName());
+        members.add(player.getName());
+        Scoreboard.syncPlayerTeams();
+        if (sendMessage) {
+            sendAll(color == TeamColor.RED ? Message.NOTICE_JOIN_RED : Message.NOTICE_JOIN_BLUE,
+                    (viewer, text) -> text.replace("%player%", player.getName()));
         }
         return true;
     }
 
     public static boolean isPlayerInRedTeam(Player player) {
-        return redTeamPlayers.contains(player.getName());
+        return redTeamPlayers().contains(player.getName());
     }
 
     public static boolean isPlayerInBlueTeam(Player player) {
-        return blueTeamPlayers.contains(player.getName());
+        return blueTeamPlayers().contains(player.getName());
     }
 
     public static void clearTeams() {
         new HashSet<>(redTeam.getEntries()).forEach(redTeam::removeEntry);
         new HashSet<>(blueTeam.getEntries()).forEach(blueTeam::removeEntry);
-        redTeamPlayers.clear();
-        blueTeamPlayers.clear();
+        arena().getTeams().clear();
         Scoreboard.syncPlayerTeams();
     }
 
     public static void restoreTeams(List<String> redPlayers, List<String> bluePlayers) {
         new HashSet<>(redTeam.getEntries()).forEach(redTeam::removeEntry);
         new HashSet<>(blueTeam.getEntries()).forEach(blueTeam::removeEntry);
-        redTeamPlayers.clear();
-        blueTeamPlayers.clear();
-        redTeamPlayers.addAll(redPlayers);
-        blueTeamPlayers.addAll(bluePlayers);
+        arena().getTeams().restore(redPlayers, bluePlayers);
         redPlayers.forEach(redTeam::addEntry);
         bluePlayers.forEach(blueTeam::addEntry);
         Scoreboard.syncPlayerTeams();
     }
-
 }

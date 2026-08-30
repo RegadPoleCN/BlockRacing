@@ -4,9 +4,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+
 import top.lqsnow.blockracing.Main;
+import top.lqsnow.blockracing.core.TeamColor;
+import top.lqsnow.blockracing.game.BlockState;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,11 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-
-import static top.lqsnow.blockracing.managers.Block.*;
-import static top.lqsnow.blockracing.managers.Game.*;
-import static top.lqsnow.blockracing.managers.Team.blueTeamPlayers;
-import static top.lqsnow.blockracing.managers.Team.redTeamPlayers;
 
 public final class GameProgressStore {
     private static final int FORMAT_VERSION = 1;
@@ -56,16 +53,16 @@ public final class GameProgressStore {
             return false;
         }
         try {
-            Game.currentGameState = Game.GameState.INGAME;
-            Game.redTeamScore = state.getInt("scores.red");
-            Game.blueTeamScore = state.getInt("scores.blue");
-            Game.redTeamCurrentBlockAmount = state.getInt("progress.red-current");
-            Game.blueTeamCurrentBlockAmount = state.getInt("progress.blue-current");
-            Game.redTeamTotalBlockAmount = state.getInt("progress.red-total");
-            Game.blueTeamTotalBlockAmount = state.getInt("progress.blue-total");
-            Game.redTeamRollCount = state.getInt("rolls.red");
-            Game.blueTeamRollCount = state.getInt("rolls.blue");
-            Game.locateCost = state.getInt("locate-cost");
+            Game.setCurrentGameState(Game.GameState.INGAME);
+            Game.setRedTeamScore(state.getInt("scores.red"));
+            Game.setBlueTeamScore(state.getInt("scores.blue"));
+            Game.setRedTeamCurrentBlockAmount(state.getInt("progress.red-current"));
+            Game.setBlueTeamCurrentBlockAmount(state.getInt("progress.blue-current"));
+            Game.setRedTeamTotalBlockAmount(state.getInt("progress.red-total"));
+            Game.setBlueTeamTotalBlockAmount(state.getInt("progress.blue-total"));
+            Game.setRedTeamRollCount(state.getInt("rolls.red"));
+            Game.setBlueTeamRollCount(state.getInt("rolls.blue"));
+            Game.setLocateCost(state.getInt("locate-cost"));
             Setting.setSpeedMode(state.getBoolean("settings.speed-mode", Setting.isSpeedMode()));
             try {
                 Setting.setCurrentGameMode(Setting.GameMode.valueOf(
@@ -74,28 +71,30 @@ public final class GameProgressStore {
                 // Keep the configured mode if an older/corrupt state contains an unknown value.
             }
 
-            redTeamBlocks = new ArrayList<>(state.getStringList("blocks.red-all"));
-            blueTeamBlocks = new ArrayList<>(state.getStringList("blocks.blue-all"));
-            redTeamRemainingBlocks = new ArrayList<>(state.getStringList("blocks.red-remaining"));
-            blueTeamRemainingBlocks = new ArrayList<>(state.getStringList("blocks.blue-remaining"));
+            BlockState blockState = GameManagerBridge.blockState();
+            replace(blockState.all(TeamColor.RED), state.getStringList("blocks.red-all"));
+            replace(blockState.all(TeamColor.BLUE), state.getStringList("blocks.blue-all"));
+            replace(blockState.remaining(TeamColor.RED), state.getStringList("blocks.red-remaining"));
+            replace(blockState.remaining(TeamColor.BLUE), state.getStringList("blocks.blue-remaining"));
 
             Team.restoreTeams(state.getStringList("teams.red"), state.getStringList("teams.blue"));
-            replace(Game.inGamePlayers, state.getStringList("players.in-game"));
-            replace(Game.freeRandomTPList, state.getStringList("players.free-random-tp"));
-            replace(Game.locateCommandPermission, state.getStringList("players.locate-permission"));
-            Game.collectAmount = readIntegerMap(state.getConfigurationSection("collected"));
+            replace(Game.inGamePlayers(), state.getStringList("players.in-game"));
+            replace(Game.freeRandomTPList(), state.getStringList("players.free-random-tp"));
+            replace(Game.locateCommandPermission(), state.getStringList("players.locate-permission"));
+            Game.collectAmount().clear();
+            Game.collectAmount().putAll(readIntegerMap(state.getConfigurationSection("collected")));
 
-            Game.redWaypoint = readLocations(state.getConfigurationSection("waypoints.red"));
-            Game.blueWaypoint = readLocations(state.getConfigurationSection("waypoints.blue"));
-            restoreChests(state, "chests.red", Game.redTeamChest);
-            restoreChests(state, "chests.blue", Game.blueTeamChest);
+            replaceLocations(Game.redWaypoint(), readLocations(state.getConfigurationSection("waypoints.red")));
+            replaceLocations(Game.blueWaypoint(), readLocations(state.getConfigurationSection("waypoints.blue")));
+            restoreChests(state, "chests.red", Game.redTeamChest());
+            restoreChests(state, "chests.blue", Game.blueTeamChest());
             recoveredGame = true;
             Main.getInstance().getLogger().info("Recovered unfinished BlockRacing game progress.");
             return true;
         } catch (RuntimeException ex) {
             Main.getInstance().getLogger().log(Level.SEVERE,
                     "Unable to restore game-progress.yml; starting in pregame instead.", ex);
-            Game.currentGameState = Game.GameState.PREGAME;
+            Game.setCurrentGameState(Game.GameState.PREGAME);
             return false;
         }
     }
@@ -140,41 +139,41 @@ public final class GameProgressStore {
         YamlConfiguration state = new YamlConfiguration();
         state.set("format-version", FORMAT_VERSION);
         state.set("state", Game.getCurrentGameState().name());
-        state.set("scores.red", Game.redTeamScore);
-        state.set("scores.blue", Game.blueTeamScore);
-        state.set("progress.red-current", Game.redTeamCurrentBlockAmount);
-        state.set("progress.blue-current", Game.blueTeamCurrentBlockAmount);
-        state.set("progress.red-total", Game.redTeamTotalBlockAmount);
-        state.set("progress.blue-total", Game.blueTeamTotalBlockAmount);
-        state.set("rolls.red", Game.redTeamRollCount);
-        state.set("rolls.blue", Game.blueTeamRollCount);
-        state.set("locate-cost", Game.locateCost);
+        state.set("scores.red", Game.redTeamScore());
+        state.set("scores.blue", Game.blueTeamScore());
+        state.set("progress.red-current", Game.redTeamCurrentBlockAmount());
+        state.set("progress.blue-current", Game.blueTeamCurrentBlockAmount());
+        state.set("progress.red-total", Game.redTeamTotalBlockAmount());
+        state.set("progress.blue-total", Game.blueTeamTotalBlockAmount());
+        state.set("rolls.red", Game.redTeamRollCount());
+        state.set("rolls.blue", Game.blueTeamRollCount());
+        state.set("locate-cost", Game.locateCost());
         state.set("settings.speed-mode", Setting.isSpeedMode());
         state.set("settings.game-mode", Setting.getCurrentGameMode().name());
-        state.set("blocks.red-all", new ArrayList<>(redTeamBlocks));
-        state.set("blocks.blue-all", new ArrayList<>(blueTeamBlocks));
-        state.set("blocks.red-remaining", new ArrayList<>(redTeamRemainingBlocks));
-        state.set("blocks.blue-remaining", new ArrayList<>(blueTeamRemainingBlocks));
-        state.set("teams.red", new ArrayList<>(redTeamPlayers));
-        state.set("teams.blue", new ArrayList<>(blueTeamPlayers));
-        state.set("players.in-game", new ArrayList<>(Game.inGamePlayers));
-        state.set("players.free-random-tp", new ArrayList<>(Game.freeRandomTPList));
-        state.set("players.locate-permission", new ArrayList<>(Game.locateCommandPermission));
-        Game.collectAmount.forEach((name, amount) -> state.set("collected." + name, amount));
-        Game.redWaypoint.forEach((index, location) -> state.set("waypoints.red." + index, location));
-        Game.blueWaypoint.forEach((index, location) -> state.set("waypoints.blue." + index, location));
-        saveChests(state, "chests.red", Game.redTeamChest);
-        saveChests(state, "chests.blue", Game.blueTeamChest);
+        state.set("blocks.red-all", new ArrayList<>(Block.redTeamBlocks()));
+        state.set("blocks.blue-all", new ArrayList<>(Block.blueTeamBlocks()));
+        state.set("blocks.red-remaining", new ArrayList<>(Block.redTeamRemainingBlocks()));
+        state.set("blocks.blue-remaining", new ArrayList<>(Block.blueTeamRemainingBlocks()));
+        state.set("teams.red", new ArrayList<>(Team.redTeamPlayers()));
+        state.set("teams.blue", new ArrayList<>(Team.blueTeamPlayers()));
+        state.set("players.in-game", new ArrayList<>(Game.inGamePlayers()));
+        state.set("players.free-random-tp", new ArrayList<>(Game.freeRandomTPList()));
+        state.set("players.locate-permission", new ArrayList<>(Game.locateCommandPermission()));
+        Game.collectAmount().forEach((name, amount) -> state.set("collected." + name, amount));
+        Game.redWaypoint().forEach((index, location) -> state.set("waypoints.red." + index, location));
+        Game.blueWaypoint().forEach((index, location) -> state.set("waypoints.blue." + index, location));
+        saveChests(state, "chests.red", Game.redTeamChest());
+        saveChests(state, "chests.blue", Game.blueTeamChest());
         return state;
     }
 
-    private static void saveChests(YamlConfiguration state, String path, List<Inventory> chests) {
+    private static void saveChests(YamlConfiguration state, String path, List<org.bukkit.inventory.Inventory> chests) {
         for (int index = 0; index < chests.size(); index++) {
             state.set(path + "." + index, Arrays.asList(chests.get(index).getContents()));
         }
     }
 
-    private static void restoreChests(YamlConfiguration state, String path, List<Inventory> chests) {
+    private static void restoreChests(YamlConfiguration state, String path, List<org.bukkit.inventory.Inventory> chests) {
         for (int index = 0; index < chests.size(); index++) {
             List<?> values = state.getList(path + "." + index, List.of());
             ItemStack[] contents = new ItemStack[chests.get(index).getSize()];
@@ -212,5 +211,18 @@ public final class GameProgressStore {
     private static void replace(List<String> target, List<String> values) {
         target.clear();
         target.addAll(values);
+    }
+
+    private static void replaceLocations(Map<Integer, Location> target, Map<Integer, Location> values) {
+        target.clear();
+        target.putAll(values);
+    }
+
+    /** Small indirection so this manager reaches the instance's block state
+     * without importing the core package everywhere. */
+    private static final class GameManagerBridge {
+        static BlockState blockState() {
+            return top.lqsnow.blockracing.core.GameManager.first().getBlockState();
+        }
     }
 }

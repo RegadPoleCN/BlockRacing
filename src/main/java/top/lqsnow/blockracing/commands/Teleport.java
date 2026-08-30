@@ -30,7 +30,7 @@ public class Teleport implements CommandExecutor, TabCompleter {
         if (getCurrentGameState().equals(GameState.PREGAME)) {
             player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
             return true;
-        } else if (!redTeamPlayers.contains(player.getName()) && !blueTeamPlayers.contains(player.getName())) {
+        } else if (!redTeamPlayers().contains(player.getName()) && !blueTeamPlayers().contains(player.getName())) {
             // Spectator
             Player target = Bukkit.getPlayerExact(args[0]);
             if (target != null) {
@@ -44,13 +44,13 @@ public class Teleport implements CommandExecutor, TabCompleter {
         }
 
         // Red Team
-        if (redTeamPlayers.contains(player.getName())) {
+        if (redTeamPlayers().contains(player.getName())) {
             Player target = Bukkit.getPlayerExact(args[0]);
             if (target == null) {
                 player.sendMessage(Message.NOTICE_PLAYER_NOT_EXIST.getString(player));
                 return true;
             }
-            if (redTeamPlayers.contains(target.getName())) {
+            if (redTeamPlayers().contains(target.getName())) {
                 player.teleport(target);
                 player.sendMessage(Message.NOTICE_TP_PLAYER_SUCCESS.getString(player).replace("%player%", target.getName()));
                 return true;
@@ -61,13 +61,13 @@ public class Teleport implements CommandExecutor, TabCompleter {
         }
 
         // Blue Team
-        if (blueTeamPlayers.contains(player.getName())) {
+        if (blueTeamPlayers().contains(player.getName())) {
             Player target = Bukkit.getPlayerExact(args[0]);
             if (target == null) {
                 player.sendMessage(Message.NOTICE_PLAYER_NOT_EXIST.getString(player));
                 return true;
             }
-            if (blueTeamPlayers.contains(target.getName())) {
+            if (blueTeamPlayers().contains(target.getName())) {
                 player.teleport(target);
                 player.sendMessage(Message.NOTICE_TP_PLAYER_SUCCESS.getString(player).replace("%player%", target.getName()));
                 return true;
@@ -82,8 +82,8 @@ public class Teleport implements CommandExecutor, TabCompleter {
     @Nullable
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (redTeamPlayers.contains(sender.getName())) return List.copyOf(redTeamPlayers);
-        if (blueTeamPlayers.contains(sender.getName())) return List.copyOf(blueTeamPlayers);
+        if (redTeamPlayers().contains(sender.getName())) return List.copyOf(redTeamPlayers());
+        if (blueTeamPlayers().contains(sender.getName())) return List.copyOf(blueTeamPlayers());
         return getOnlinePlayersString();
     }
 }

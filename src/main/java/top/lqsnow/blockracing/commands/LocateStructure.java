@@ -11,11 +11,10 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import top.lqsnow.blockracing.Main;
+import top.lqsnow.blockracing.managers.Game;
 import top.lqsnow.blockracing.managers.Message;
 
 import java.util.List;
-
-import static top.lqsnow.blockracing.managers.Game.locateCommandPermission;
 
 public class LocateStructure implements CommandExecutor, TabCompleter {
     @Override
@@ -29,9 +28,9 @@ public class LocateStructure implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (locateCommandPermission.contains(player.getName())) {
+        if (Game.locateCommandPermission().contains(player.getName())) {
             if (player.performCommand("locate structure " + args[0])) {
-                locateCommandPermission.remove(player.getName());
+                Game.locateCommandPermission().remove(player.getName());
                 player.addAttachment(Main.getInstance(), "minecraft.command.locate", false);
             }
         } else player.sendMessage(Message.NOTICE_LOCATE_NO_PERMISSION.getString(player));

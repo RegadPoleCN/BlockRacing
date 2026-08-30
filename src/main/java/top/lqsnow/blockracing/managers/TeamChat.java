@@ -27,8 +27,8 @@ public final class TeamChat {
             return;
         }
         Player sender = event.getPlayer();
-        boolean red = Team.redTeamPlayers.contains(sender.getName());
-        boolean blue = Team.blueTeamPlayers.contains(sender.getName());
+        boolean red = Team.redTeamPlayers().contains(sender.getName());
+        boolean blue = Team.blueTeamPlayers().contains(sender.getName());
         if (!red && !blue) {
             return;
         }
@@ -48,7 +48,7 @@ public final class TeamChat {
             return;
         }
 
-        Set<String> members = red ? Set.copyOf(Team.redTeamPlayers) : Set.copyOf(Team.blueTeamPlayers);
+        Set<String> members = red ? Set.copyOf(Team.redTeamPlayers()) : Set.copyOf(Team.blueTeamPlayers());
         event.viewers().removeIf(viewer -> viewer instanceof Player player
                 && !members.contains(player.getName()));
         Message format = red ? Message.TEAM_RED_CHAT : Message.TEAM_BLUE_CHAT;
@@ -83,9 +83,9 @@ public final class TeamChat {
 
     private static String globalTeamPrefix(Player viewer, String playerName) {
         Message prefix;
-        if (Team.redTeamPlayers.contains(playerName)) {
+        if (Team.redTeamPlayers().contains(playerName)) {
             prefix = Message.TEAM_RED_PREFIX;
-        } else if (Team.blueTeamPlayers.contains(playerName)) {
+        } else if (Team.blueTeamPlayers().contains(playerName)) {
             prefix = Message.TEAM_BLUE_PREFIX;
         } else {
             return "&7[--]";
@@ -95,9 +95,9 @@ public final class TeamChat {
 
     private static String globalPlayerName(Player viewer, String playerName) {
         Message color;
-        if (Team.redTeamPlayers.contains(playerName)) {
+        if (Team.redTeamPlayers().contains(playerName)) {
             color = Message.TEAM_RED_COLOR;
-        } else if (Team.blueTeamPlayers.contains(playerName)) {
+        } else if (Team.blueTeamPlayers().contains(playerName)) {
             color = Message.TEAM_BLUE_COLOR;
         } else {
             return "&7" + playerName;

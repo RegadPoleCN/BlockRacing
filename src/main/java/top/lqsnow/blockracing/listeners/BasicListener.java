@@ -104,8 +104,7 @@ public class BasicListener implements Listener {
     }
 
     public static void setBlockAmount(int blockAmount, Boolean sendMessage) {
-        Block.addUpBlocks();
-        blockAmount = Block.clampBlockAmount(blockAmount, maxBlockAmount);
+        blockAmount = Block.clampBlockAmount(blockAmount, Block.maxBlockAmount());
         if (sendMessage) {
             int finalBlockAmount = blockAmount;
             sendAll(Message.NOTICE_SET_BLOCKS_SUCCESS,

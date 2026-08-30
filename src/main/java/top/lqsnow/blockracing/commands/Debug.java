@@ -10,6 +10,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import top.lqsnow.blockracing.managers.Game;
 import top.lqsnow.blockracing.managers.LanguageManager;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
@@ -58,26 +59,26 @@ public class Debug implements CommandExecutor, TabCompleter {
             if (args[1].equalsIgnoreCase("red")) {
                 if (args[2].equalsIgnoreCase("all") || args[2].isEmpty()) {
                     int amount = getCurrentBlocks("red").size();
-                    for (int i = 0; i < amount; i++) redTaskComplete(redTeamRemainingBlocks.get(0), "Debug");
+                    for (int i = 0; i < amount; i++) redTaskComplete(redTeamRemainingBlocks().get(0), "Debug");
                     return true;
                 }
-                redTaskComplete(redTeamRemainingBlocks.get(Integer.parseInt(args[2]) - 1), "Debug");
+                redTaskComplete(redTeamRemainingBlocks().get(Integer.parseInt(args[2]) - 1), "Debug");
             } else if (args[1].equalsIgnoreCase("blue")) {
                 if (args[2].equalsIgnoreCase("all") || args[2].isEmpty()) {
                     int amount = getCurrentBlocks("blue").size();
-                    for (int i = 0; i < amount; i++) blueTaskComplete(blueTeamRemainingBlocks.get(0), "Debug");
+                    for (int i = 0; i < amount; i++) blueTaskComplete(blueTeamRemainingBlocks().get(0), "Debug");
                     return true;
                 }
-                blueTaskComplete(blueTeamRemainingBlocks.get(Integer.parseInt(args[2]) - 1), "Debug");
+                blueTaskComplete(blueTeamRemainingBlocks().get(Integer.parseInt(args[2]) - 1), "Debug");
             }
         }
 
         // Set score
         if (args[0].equalsIgnoreCase("setscore")) {
             if (args[1].equalsIgnoreCase("red")) {
-                redTeamScore = Integer.parseInt(args[2]);
+                Game.setRedTeamScore(Integer.parseInt(args[2]));
             } else if (args[1].equalsIgnoreCase("blue")) {
-                blueTeamScore = Integer.parseInt(args[2]);
+                Game.setBlueTeamScore(Integer.parseInt(args[2]));
             }
             updateScoreboard();
         }
@@ -86,15 +87,15 @@ public class Debug implements CommandExecutor, TabCompleter {
         if (args[0].equalsIgnoreCase("getblock")) {
             if (args[1].equalsIgnoreCase("red")) {
                 if (args[2].equalsIgnoreCase("remain")) {
-                    sender.sendMessage("Red remaining blocks：" + redTeamRemainingBlocks.toString());
+                    sender.sendMessage("Red remaining blocks：" + redTeamRemainingBlocks().toString());
                 } else if (args[2].equalsIgnoreCase("all")) {
-                    sender.sendMessage("Red all blocks：" + redTeamBlocks.toString());
+                    sender.sendMessage("Red all blocks：" + redTeamBlocks().toString());
                 }
             } else if (args[1].equalsIgnoreCase("blue")) {
                 if (args[2].equalsIgnoreCase("remain")) {
-                    sender.sendMessage("Blue remaining blocks：" + blueTeamRemainingBlocks.toString());
+                    sender.sendMessage("Blue remaining blocks：" + blueTeamRemainingBlocks().toString());
                 } else if (args[2].equalsIgnoreCase("all")) {
-                    sender.sendMessage("Blue all blocks：" + blueTeamBlocks.toString());
+                    sender.sendMessage("Blue all blocks：" + blueTeamBlocks().toString());
                 }
             }
         }
@@ -114,8 +115,8 @@ public class Debug implements CommandExecutor, TabCompleter {
 
         // Get team situation
         if (args[0].equalsIgnoreCase("getteam")) {
-            player.sendMessage("Red team Players: " + redTeamPlayers.toString());
-            player.sendMessage("Blue team Players: " + blueTeamPlayers.toString());
+            player.sendMessage("Red team Players: " + redTeamPlayers().toString());
+            player.sendMessage("Blue team Players: " + blueTeamPlayers().toString());
         }
 
         // Set team member
@@ -146,10 +147,10 @@ public class Debug implements CommandExecutor, TabCompleter {
                     boolean result = false;
                     if (args[1].equalsIgnoreCase("red")) {
                         result = redTeam.removeEntry(targetName);
-                        redTeamPlayers.remove(targetName);
+                        redTeamPlayers().remove(targetName);
                     } else if (args[1].equalsIgnoreCase("blue")) {
                         result = blueTeam.removeEntry(targetName);
-                        blueTeamPlayers.remove(targetName);
+                        blueTeamPlayers().remove(targetName);
                     }
                     Scoreboard.syncPlayerTeams();
                     if (result) {
@@ -247,8 +248,8 @@ public class Debug implements CommandExecutor, TabCompleter {
                 if (args[2].equalsIgnoreCase("add")) {
                     return getOnlinePlayersString();
                 } else if (args[2].equalsIgnoreCase("remove")) {
-                    if (args[1].equalsIgnoreCase("red")) return redTeamPlayers;
-                    else if (args[1].equalsIgnoreCase("blue")) return blueTeamPlayers;
+                    if (args[1].equalsIgnoreCase("red")) return redTeamPlayers();
+                    else if (args[1].equalsIgnoreCase("blue")) return blueTeamPlayers();
                 }
             }
         }

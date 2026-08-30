@@ -18,17 +18,16 @@ import top.lqsnow.blockracing.toolkit.menu.MenuButton;
 import top.lqsnow.blockracing.toolkit.menu.MenuView;
 import top.lqsnow.blockracing.utils.TranslationUtil;
 
-import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import static top.lqsnow.blockracing.managers.Game.*;
 import static top.lqsnow.blockracing.managers.Gui.openTeamChest;
 import static top.lqsnow.blockracing.managers.Gui.updateMenu;
-import static top.lqsnow.blockracing.managers.Team.blueTeamPlayers;
-import static top.lqsnow.blockracing.managers.Team.redTeamPlayers;
-import static top.lqsnow.blockracing.utils.CommandUtil.sendAll;
+import top.lqsnow.blockracing.managers.Team;
+import top.lqsnow.blockracing.utils.CommandUtil;
 
 public final class GameMenu extends MenuView {
     public GameMenu() {
@@ -67,10 +66,10 @@ public final class GameMenu extends MenuView {
                         .lore(Message.MENU_WAYPOINTS_LORE.getStringList(player))
                         .build(),
                 (player, click) -> {
-                    if (redTeamPlayers.contains(player.getName())) {
-                        new WayPointMenu(redWaypoint, redWaypointIconCache).open(player);
-                    } else if (blueTeamPlayers.contains(player.getName())) {
-                        new WayPointMenu(blueWaypoint, blueWaypointIconCache).open(player);
+                    if (Team.redTeamPlayers().contains(player.getName())) {
+                        new WayPointMenu(Game.redWaypoint(), Game.redWaypointIconCache()).open(player);
+                    } else if (Team.blueTeamPlayers().contains(player.getName())) {
+                        new WayPointMenu(Game.blueWaypoint(), Game.blueWaypointIconCache()).open(player);
                     }
                 }
         ));
@@ -147,27 +146,27 @@ public final class GameMenu extends MenuView {
     }
 
     private void handleRandomTeleport(Player player) {
-        if (freeRandomTPList.remove(player.getName())) {
+        if (freeRandomTPList().remove(player.getName())) {
             Game.randomTeleport(player, false);
             return;
         }
 
-        if (redTeamPlayers.contains(player.getName()) && redTeamScore < 2
-                || blueTeamPlayers.contains(player.getName()) && blueTeamScore < 2) {
+        if (Team.redTeamPlayers().contains(player.getName()) && redTeamScore() < 2
+                || Team.blueTeamPlayers().contains(player.getName()) && blueTeamScore() < 2) {
             player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
             return;
         }
 
         player.closeInventory();
         randomTeleport(player, false);
-        if (redTeamPlayers.contains(player.getName())) {
-            redTeamScore -= 2;
-            sendAll(Message.NOTICE_RANDOM_TP,
+        if (Team.redTeamPlayers().contains(player.getName())) {
+            Game.setRedTeamScore(redTeamScore() - 2);
+            CommandUtil.sendAll(Message.NOTICE_RANDOM_TP,
                     (viewer, text) -> text.replace("%player%",
                             Message.TEAM_RED_COLOR.getString(viewer) + player.getName()));
-        } else if (blueTeamPlayers.contains(player.getName())) {
-            blueTeamScore -= 2;
-            sendAll(Message.NOTICE_RANDOM_TP,
+        } else if (Team.blueTeamPlayers().contains(player.getName())) {
+            Game.setBlueTeamScore(blueTeamScore() - 2);
+            CommandUtil.sendAll(Message.NOTICE_RANDOM_TP,
                     (viewer, text) -> text.replace("%player%",
                             Message.TEAM_BLUE_COLOR.getString(viewer) + player.getName()));
         }
@@ -225,10 +224,10 @@ public final class GameMenu extends MenuView {
     }
 
     public static final class WayPointMenu extends MenuView {
-        private final HashMap<Integer, Location> waypoints;
-        private final HashMap<Integer, Material> iconCache;
+        private final Map<Integer, Location> waypoints;
+        private final Map<Integer, Material> iconCache;
 
-        public WayPointMenu(HashMap<Integer, Location> waypoints, HashMap<Integer, Material> iconCache) {
+        public WayPointMenu(Map<Integer, Location> waypoints, Map<Integer, Material> iconCache) {
             super(menuSize(Setting.getMaxTeamWaypointNum()),
                     player -> Message.MENU_WAYPOINT_TITLE.getString(player));
             this.waypoints = waypoints;
@@ -310,9 +309,9 @@ public final class GameMenu extends MenuView {
     }
 
     private static List<Player> getOnlineTeammates(Player player) {
-        List<String> team = redTeamPlayers.contains(player.getName())
-                ? redTeamPlayers
-                : blueTeamPlayers.contains(player.getName()) ? blueTeamPlayers : List.of();
+        List<String> team = Team.redTeamPlayers().contains(player.getName())
+                ? Team.redTeamPlayers()
+                : Team.blueTeamPlayers().contains(player.getName()) ? Team.blueTeamPlayers() : List.of();
         List<Player> teammates = new ArrayList<>();
         for (String name : team) {
             Player teammate = org.bukkit.Bukkit.getPlayerExact(name);
@@ -343,8 +342,8 @@ public final class GameMenu extends MenuView {
             player.closeInventory();
             return;
         }
-        boolean sameTeam = redTeamPlayers.contains(player.getName()) && redTeamPlayers.contains(targetName)
-                || blueTeamPlayers.contains(player.getName()) && blueTeamPlayers.contains(targetName);
+        boolean sameTeam = Team.redTeamPlayers().contains(player.getName()) && Team.redTeamPlayers().contains(targetName)
+                || Team.blueTeamPlayers().contains(player.getName()) && Team.blueTeamPlayers().contains(targetName);
         if (!sameTeam) {
             player.sendMessage(Message.NOTICE_PLAYER_NOT_IN_SAME_TEAM.getString(player));
             player.closeInventory();
@@ -362,7 +361,7 @@ public final class GameMenu extends MenuView {
 
     private static List<String> replaceScorePlaceholder(List<String> lore) {
         return lore.stream()
-                .map(line -> line.replace("%score%", String.valueOf(locateCost)))
+                .map(line -> line.replace("%score%", String.valueOf(locateCost())))
                 .toList();
     }
 

@@ -38,12 +38,12 @@ public class WayPoint implements CommandExecutor {
             return true;
         }
         if (args[0].equalsIgnoreCase("remove")) {
-            if (redTeamPlayers.contains(player.getName())) {
+            if (redTeamPlayers().contains(player.getName())) {
                 boolean flag = removeWaypoint("red", index);
                 if (!flag) return true;
                 sendRed(Message.NOTICE_RED_REMOVE_WAYPOINT, (viewer, text) -> text
                         .replace("%player%", player.getName()).replace("%index%", String.valueOf(index)));
-            } else if (blueTeamPlayers.contains(player.getName())) {
+            } else if (blueTeamPlayers().contains(player.getName())) {
                 boolean flag = removeWaypoint("blue", index);
                 if (!flag) return true;
                 sendBlue(Message.NOTICE_BLUE_REMOVE_WAYPOINT, (viewer, text) -> text
@@ -55,9 +55,9 @@ public class WayPoint implements CommandExecutor {
 
     private boolean removeWaypoint(String team, int index) {
         if (team.equals("red")) {
-            redWaypoint.remove(index);
+            redWaypoint().remove(index);
         } else {
-            blueWaypoint.remove(index);
+            blueWaypoint().remove(index);
         }
         GameProgressStore.saveNow();
 

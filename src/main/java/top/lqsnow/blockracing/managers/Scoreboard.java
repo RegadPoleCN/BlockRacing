@@ -59,15 +59,15 @@ public final class Scoreboard {
 
     public static String getBlockDisplay(String block, Player player) {
         Message difficulty;
-        if (easyBlocks.contains(block)) {
+        if (Block.easyBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_EASY;
-        } else if (mediumBlocks.contains(block)) {
+        } else if (Block.mediumBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_MEDIUM;
-        } else if (hardBlocks.contains(block)) {
+        } else if (Block.hardBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_HARD;
-        } else if (dyedBlocks.contains(block)) {
+        } else if (Block.dyedBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_DYED;
-        } else if (endBlocks.contains(block)) {
+        } else if (Block.endBlocks().contains(block)) {
             difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_END;
         } else {
             return null;
@@ -85,7 +85,6 @@ public final class Scoreboard {
                         ? TranslationUtil.getValue(block)
                         : TranslationUtil.getValue(block, player));
     }
-
     public static void showScoreboard(Player player) {
         PlayerBoard view = createPlayerBoard(player);
         PLAYER_BOARDS.put(player.getUniqueId(), view);
@@ -197,26 +196,26 @@ public final class Scoreboard {
         setTitle(objective, text(Message.SCOREBOARD_INGAME_TITLE, player));
         List<String> contentLines = new ArrayList<>();
         String redScore = text(Message.SCOREBOARD_RED_SCORE, player)
-                .replace("%score%", String.valueOf(redTeamScore))
-                .replace("%current_block%", String.valueOf(redTeamCurrentBlockAmount))
-                .replace("%total_block%", String.valueOf(redTeamTotalBlockAmount));
+                .replace("%score%", String.valueOf(Game.redTeamScore()))
+                .replace("%current_block%", String.valueOf(Game.redTeamCurrentBlockAmount()))
+                .replace("%total_block%", String.valueOf(Game.redTeamTotalBlockAmount()));
         contentLines.add(redScore);
         setSlot(board, objective, 11, redScore);
 
         for (int i = 0; i < getCurrentBlocks("red").size(); i++) {
-            String block = getBlockDisplay(redTeamRemainingBlocks.get(i), player);
+            String block = getBlockDisplay(Block.redTeamRemainingBlocks().get(i), player);
             contentLines.add(block);
             setSlot(board, objective, 10 - i, block);
         }
         String blueScore = text(Message.SCOREBOARD_BLUE_SCORE, player)
-                .replace("%score%", String.valueOf(blueTeamScore))
-                .replace("%current_block%", String.valueOf(blueTeamCurrentBlockAmount))
-                .replace("%total_block%", String.valueOf(blueTeamTotalBlockAmount));
+                .replace("%score%", String.valueOf(Game.blueTeamScore()))
+                .replace("%current_block%", String.valueOf(Game.blueTeamCurrentBlockAmount()))
+                .replace("%total_block%", String.valueOf(Game.blueTeamTotalBlockAmount()));
         contentLines.add(blueScore);
         setSlot(board, objective, 5, blueScore);
 
         for (int i = 0; i < getCurrentBlocks("blue").size(); i++) {
-            String block = getBlockDisplay(blueTeamRemainingBlocks.get(i), player);
+            String block = getBlockDisplay(Block.blueTeamRemainingBlocks().get(i), player);
             contentLines.add(block);
             setSlot(board, objective, 4 - i, block);
         }
@@ -232,8 +231,8 @@ public final class Scoreboard {
 
         new HashSet<>(red.getEntries()).forEach(red::removeEntry);
         new HashSet<>(blue.getEntries()).forEach(blue::removeEntry);
-        top.lqsnow.blockracing.managers.Team.redTeamPlayers.forEach(red::addEntry);
-        top.lqsnow.blockracing.managers.Team.blueTeamPlayers.forEach(blue::addEntry);
+        top.lqsnow.blockracing.managers.Team.redTeamPlayers().forEach(red::addEntry);
+        top.lqsnow.blockracing.managers.Team.blueTeamPlayers().forEach(blue::addEntry);
         localizeTeam(red, Message.TEAM_RED_NAME, Message.TEAM_RED_PREFIX, player);
         localizeTeam(blue, Message.TEAM_BLUE_NAME, Message.TEAM_BLUE_PREFIX, player);
     }

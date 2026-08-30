@@ -78,11 +78,10 @@ public class Main extends JavaPlugin {
         Message.saveDefaultConfig();
         Message.load();
         LanguageManager.load();
-        Setting.getSettings();
-        Game.initChest();
+        top.lqsnow.blockracing.core.GameManager.init();
+        top.lqsnow.blockracing.core.GameManager.get().createGame();
         Team.createTeam();
         Scoreboard.createScoreboard();
-        new Block();
         Block.checkBlock();
         Block.refreshAvailableBlocksAndClampAmount();
         boolean recoveredGame = GameProgressStore.load();
@@ -93,7 +92,6 @@ public class Main extends JavaPlugin {
             Scoreboard.setPreGameScoreboard();
         }
         GameProgressStore.startAutosave();
-        new Game.runPer2Tick().runTaskTimer(this, 0L, 2L);
 
         if (!recoveredGame) {
             // Only initialize a fresh pregame world. A recovered game must keep

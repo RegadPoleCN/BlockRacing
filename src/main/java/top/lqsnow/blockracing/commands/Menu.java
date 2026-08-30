@@ -47,23 +47,23 @@ public class Menu implements CommandExecutor, TabCompleter {
                 player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
                 return true;
             }
-            if (redTeamPlayers.contains(player.getName())) {
+            if (redTeamPlayers().contains(player.getName())) {
                 if (args.length == 1) {
                     new GameMenu.TeamChestSelectMenu().open(player);
                     return true;
                 }
-                Integer ith = parseIndex(args[1], redTeamChest.size());
+                Integer ith = parseIndex(args[1], redTeamChest().size());
                 if (ith == null) {
                     player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
                     return true;
                 }
                 Gui.openTeamChest(player, ith - 1);
-            } else if (blueTeamPlayers.contains(player.getName())) {
+            } else if (blueTeamPlayers().contains(player.getName())) {
                 if (args.length == 1) {
                     new GameMenu.TeamChestSelectMenu().open(player);
                     return true;
                 }
-                Integer ith = parseIndex(args[1], blueTeamChest.size());
+                Integer ith = parseIndex(args[1], blueTeamChest().size());
                 if (ith == null) {
                     player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
                     return true;
@@ -80,10 +80,10 @@ public class Menu implements CommandExecutor, TabCompleter {
             }
 
             if (args.length == 1) {
-                if (redTeamPlayers.contains(player.getName())) {
-                    new GameMenu.WayPointMenu(redWaypoint, redWaypointIconCache).open(player);
-                } else if (blueTeamPlayers.contains(player.getName())) {
-                    new GameMenu.WayPointMenu(blueWaypoint, blueWaypointIconCache).open(player);
+                if (redTeamPlayers().contains(player.getName())) {
+                    new GameMenu.WayPointMenu(redWaypoint(), redWaypointIconCache()).open(player);
+                } else if (blueTeamPlayers().contains(player.getName())) {
+                    new GameMenu.WayPointMenu(blueWaypoint(), blueWaypointIconCache()).open(player);
                 }
                 return true;
             }
@@ -124,29 +124,29 @@ public class Menu implements CommandExecutor, TabCompleter {
                 player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
                 return true;
             }
-            if (freeRandomTPList.contains(player.getName())) {
+            if (freeRandomTPList().contains(player.getName())) {
                 Game.randomTeleport(player, false);
-                freeRandomTPList.remove(player.getName());
+                freeRandomTPList().remove(player.getName());
             } else {
-                if (redTeamPlayers.contains(player.getName())) {
-                    if (redTeamScore < 2) {
+                if (redTeamPlayers().contains(player.getName())) {
+                    if (redTeamScore() < 2) {
                         player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
                         return true;
                     }
-                } else if (blueTeamPlayers.contains(player.getName())) {
-                    if (blueTeamScore < 2) {
+                } else if (blueTeamPlayers().contains(player.getName())) {
+                    if (blueTeamScore() < 2) {
                         player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
                         return true;
                     }
                 }
                 player.closeInventory();
                 randomTeleport(player, false);
-                if (redTeamPlayers.contains(player.getName())) {
-                    redTeamScore -= 2;
+                if (redTeamPlayers().contains(player.getName())) {
+                    Game.setRedTeamScore(redTeamScore() - 2);
                     sendAll(Message.NOTICE_RANDOM_TP, (viewer, text) -> text.replace("%player%",
                             Message.TEAM_RED_COLOR.getString(viewer) + player.getName()));
-                } else if (blueTeamPlayers.contains(player.getName())) {
-                    blueTeamScore -= 2;
+                } else if (blueTeamPlayers().contains(player.getName())) {
+                    Game.setBlueTeamScore(blueTeamScore() - 2);
                     sendAll(Message.NOTICE_RANDOM_TP, (viewer, text) -> text.replace("%player%",
                             Message.TEAM_BLUE_COLOR.getString(viewer) + player.getName()));
                 }
