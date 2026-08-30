@@ -38,16 +38,26 @@ max-team-waypoint-num: 8
 max-roll-count: 3
 
 # Whether to restore an unfinished game after a server restart.
-# Keep this disabled on public servers where finished games recycle automatically.
+# Disabled by default: finished games recycle automatically and public servers
+# should not resume old rounds.
 recovery:
-  enabled: true
+  enabled: false
 
 # World settings for per-game arenas.
 # world-prefix - each game runs in its own world named "<world-prefix><id>".
 # backup-keep  - how many recycled arena worlds to keep in world-backups/.
+# min-players / max-players - join limits per game.
+# auto-start - start automatically once everyone is ready and min-players met.
+# idle-rooms - number of empty waiting rooms kept available.
+# max-game-minutes - watchdog limit before a running game is force-ended.
 arena:
   world-prefix: "arena_"
   backup-keep: 8
+  min-players: 2
+  max-players: 8
+  auto-start: true
+  idle-rooms: 1
+  max-game-minutes: 240
 
 # Internal compatibility value. Do not edit this manually.
 config-version: 26.2.1

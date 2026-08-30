@@ -25,7 +25,12 @@ public enum Config {
     MAX_ROLL_COUNT("max-roll-count"),
     RECOVERY_ENABLED("recovery.enabled"),
     WORLD_PREFIX("arena.world-prefix"),
-    BACKUP_KEEP("arena.backup-keep");
+    BACKUP_KEEP("arena.backup-keep"),
+    MIN_PLAYERS("arena.min-players"),
+    MAX_PLAYERS("arena.max-players"),
+    AUTO_START("arena.auto-start"),
+    IDLE_ROOMS("arena.idle-rooms"),
+    MAX_GAME_MINUTES("arena.max-game-minutes");
 
     private static File file;
     private static FileConfiguration config;

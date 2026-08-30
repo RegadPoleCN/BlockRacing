@@ -42,7 +42,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import top.lqsnow.blockracing.Main;
-import top.lqsnow.blockracing.commands.Restart;
 import top.lqsnow.blockracing.game.BlockCatalog;
 import top.lqsnow.blockracing.game.BlockState;
 import top.lqsnow.blockracing.game.RandomTeleportService;
@@ -100,6 +99,7 @@ public class GameInstance {
     private BukkitTask waitingTask;
     private BukkitTask tickTask;
     private World world;
+    private long startedAt;
 
     public GameInstance(int id, SessionManager sessions, RoomSettings settings) {
         this.id = id;
@@ -149,12 +149,6 @@ public class GameInstance {
         } else if (state == RoomState.RUNNING) {
             if (GameProgressStore.hasRecoveredGame()) {
                 Message.NOTICE_RECOVERED_GAME.getStringList(player).forEach(player::sendMessage);
-                player.sendMessage(LEGACY_SERIALIZER.deserialize(
-                                Message.NOTICE_RECOVERED_RESET_BUTTON.getString(player))
-                        .clickEvent(ClickEvent.runCommand("/restartgame"))
-                        .hoverEvent(HoverEvent.showText(
-                                LEGACY_SERIALIZER.deserialize(
-                                        Message.NOTICE_RECOVERED_RESET_HOVER.getString(player)))));
             }
             // Spectator
             if (!teams.contains(player.getName())) {
@@ -185,7 +179,6 @@ public class GameInstance {
         redRollPlayers.remove(player.getName());
         readyPlayers.remove(player.getName());
         sessions.getEditAmountPlayers().remove(player.getName());
-        Restart.removeVote(player);
     }
 
     private void checkUpdate(Player player) {
@@ -224,7 +217,34 @@ public class GameInstance {
         } else {
             readyPlayers.remove(player.getName());
             broadcast.all(Message.NOTICE_CANCEL_READY, (viewer, text) -> text.replace("%player%", player.getName()));
+            return;
         }
+        maybeAutoStart();
+    }
+
+    /** Starts automatically when auto-start is on and everyone ready satisfies the limits. */
+    private void maybeAutoStart() {
+        if (!Config.AUTO_START.getBoolean() || state != RoomState.WAITING) {
+            return;
+        }
+        int online = Bukkit.getOnlinePlayers().size();
+        if (online < Math.max(1, Config.MIN_PLAYERS.getInt())) {
+            return;
+        }
+        if (readyPlayers.isEmpty() || readyPlayers.size() != online) {
+            return;
+        }
+        if (teams.hasEmptyTeam() || !validateBlocks()) {
+            return;
+        }
+        broadcast.all(Message.NOTICE_START);
+        start();
+    }
+
+    public int playerCount() {
+        return (int) Bukkit.getOnlinePlayers().stream()
+                .filter(player -> sessions.arenaOf(player).map(a -> a == this).orElse(false))
+                .count();
     }
 
     // Check if the game can start. If not, send the reason to the player; if
@@ -268,6 +288,7 @@ public class GameInstance {
     public void start() {
         // Init
         state = RoomState.RUNNING;
+        startedAt = System.currentTimeMillis();
         GuiBridge.closeAllPlayersMenu();
         sessions.getEditAmountPlayers().clear();
         blockState.setup(settings, catalog, new Random());
@@ -782,6 +803,55 @@ public class GameInstance {
         broadcast.sound(Sound.UI_TOAST_CHALLENGE_COMPLETE);
         state = RoomState.ENDING;
         GameProgressStore.clear();
+        GameManager.get().scheduleDispose(this);
+    }
+
+    /** Watchdog exit: no winner, no titles, straight to recycling. */
+    public void forceEnd() {
+        if (state != RoomState.RUNNING) {
+            return;
+        }
+        Bukkit.getLogger().warning("[BlockRacing] Game " + id + " exceeded the time limit and was force-ended.");
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (sessions.arenaOf(player).map(a -> a == this).orElse(false)) {
+                player.closeInventory();
+                player.setGameMode(GameMode.SPECTATOR);
+            }
+        }
+        state = RoomState.ENDING;
+        GameProgressStore.clear();
+        GameManager.get().scheduleDispose(this);
+    }
+
+    /** Recycles the arena: players go back to a fresh waiting game, the world
+     * folder is moved to backups and deleted in the background. */
+    public void dispose() {
+        if (state == RoomState.DISPOSED) {
+            return;
+        }
+        state = RoomState.DISPOSED;
+        if (waitingTask != null) {
+            waitingTask.cancel();
+        }
+        if (tickTask != null) {
+            tickTask.cancel();
+        }
+        List<Player> players = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (sessions.arenaOf(player).map(a -> a == this).orElse(false)) {
+                players.add(player);
+                sessions.leaveArena(player);
+            }
+        }
+        GameManager.get().remove(this);
+        GameInstance fresh = GameManager.get().createGame();
+        for (Player player : players) {
+            fresh.playerLogin(player);
+        }
+        if (world != null) {
+            top.lqsnow.blockracing.world.ArenaWorldService.get().deleteArenaWorld(world);
+            world = null;
+        }
     }
 
     /** Validates the selectable pool for the current settings (original Block.checkBlock). */
@@ -848,6 +918,15 @@ public class GameInstance {
 
     public int getId() {
         return id;
+    }
+
+    public long getStartedAt() {
+        return startedAt;
+    }
+
+    /** Binds a world that already exists on disk (crash recovery). */
+    public void adoptWorld(World world) {
+        this.world = world;
     }
 
     public RoomState getState() {

@@ -14,9 +14,10 @@ commands:
   locatebiome:
     usage: "/locate <Biome>"
     description: "Locate biome."
-  restartgame:
-    usage: "/restartgame"
-    description: "Restart the game."
+  bradmin:
+    usage: "/bradmin <start|stop>"
+    description: "Admin operations on arenas."
+    permission: blockracing.admin
   debug:
     usage: "/debug"
     description: "Debug."

@@ -39,16 +39,25 @@ max-team-waypoint-num: 8
 max-roll-count: 3
 
 # 服务器重启后是否恢复上一局未完成的游戏进度
-# 公开服务器建议关闭：游戏结束后世界会自动回收
+# 默认关闭：游戏结束后世界会自动回收，公开服务器不建议开启
 recovery:
-  enabled: true
+  enabled: false
 
 # 每局游戏的独立世界设置
 # world-prefix - 每局游戏在名为“<world-prefix><编号>”的独立世界中运行
 # backup-keep  - world-backups/ 目录中保留的已回收世界备份数量
+# min-players / max-players - 每局游戏的加入人数下限/上限
+# auto-start - 所有人准备且达到最少人数后自动开局
+# idle-rooms - 保持可用的空等待房间数量
+# max-game-minutes - 看门狗强制结束一局的最长时间（分钟）
 arena:
   world-prefix: "arena_"
   backup-keep: 8
+  min-players: 2
+  max-players: 8
+  auto-start: true
+  idle-rooms: 1
+  max-game-minutes: 240
 
 # 内部兼容版本，请勿手动修改
 config-version: 26.2.1

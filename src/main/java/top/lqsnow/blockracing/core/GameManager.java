@@ -4,7 +4,11 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.bukkit.Bukkit;
+
+import top.lqsnow.blockracing.Main;
 import top.lqsnow.blockracing.game.RoomSettings;
+import top.lqsnow.blockracing.managers.Config;
 import top.lqsnow.blockracing.session.SessionManager;
 
 /** Registry of running game instances. During the transition there is exactly
@@ -39,10 +43,55 @@ public final class GameManager {
     }
 
     public GameInstance createGame() {
-        GameInstance game = new GameInstance(nextId, sessions, RoomSettings.fromConfig());
-        games.put(nextId, game);
-        nextId++;
+        return createGame(nextId);
+    }
+
+    /** Creates a game with a specific id (used by crash recovery). */
+    public GameInstance createGame(int id) {
+        GameInstance game = new GameInstance(id, sessions, RoomSettings.fromConfig());
+        games.put(id, game);
+        nextId = Math.max(nextId, id + 1);
         return game;
+    }
+
+    /** A waiting game with room left, or a freshly created one. */
+    public GameInstance findJoinable() {
+        for (GameInstance game : games.values()) {
+            if (game.getState() == RoomState.WAITING
+                    && game.playerCount() < Config.MAX_PLAYERS.getInt()) {
+                return game;
+            }
+        }
+        return createGame();
+    }
+
+    /** Keeps at least idle-rooms empty waiting games available. */
+    public void maintainIdleRooms() {
+        int idleRooms = Math.max(1, Config.IDLE_ROOMS.getInt());
+        long emptyWaiting = games.values().stream()
+                .filter(game -> game.getState() == RoomState.WAITING && game.playerCount() == 0)
+                .count();
+        for (long i = emptyWaiting; i < idleRooms; i++) {
+            createGame();
+        }
+    }
+
+    /** Force-ends games that have been running longer than the configured limit. */
+    public void startWatchdog() {
+        long maxMillis = Math.max(1, Config.MAX_GAME_MINUTES.getInt()) * 60_000L;
+        Bukkit.getScheduler().runTaskTimer(Main.getInstance(), () -> {
+            for (GameInstance game : games.values()) {
+                if (game.getState() == RoomState.RUNNING
+                        && System.currentTimeMillis() - game.getStartedAt() > maxMillis) {
+                    game.forceEnd();
+                }
+            }
+        }, 400L, 400L);
+    }
+
+    /** Ends the "game over" display phase after 10 seconds and recycles the arena. */
+    public void scheduleDispose(GameInstance game) {
+        Bukkit.getScheduler().runTaskLater(Main.getInstance(), game::dispose, 200L);
     }
 
     public void remove(GameInstance game) {

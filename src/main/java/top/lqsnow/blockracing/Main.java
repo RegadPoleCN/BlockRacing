@@ -6,9 +6,11 @@ import org.bukkit.GameRules;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 import top.lqsnow.blockracing.commands.*;
+import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.listeners.BasicListener;
 import top.lqsnow.blockracing.managers.*;
 import top.lqsnow.blockracing.toolkit.menu.MenuListener;
+import top.lqsnow.blockracing.world.ArenaWorldService;
 
 import static org.bukkit.Bukkit.getPluginCommand;
 import static org.bukkit.Bukkit.getPluginManager;
@@ -23,12 +25,6 @@ public class Main extends JavaPlugin {
 
     public static String getVersion() {
         return instance.getPluginMeta().getVersion();
-    }
-
-    @Override
-    public void onLoad() {
-        instance = this;
-        WorldResetMarker.processPendingReset(this);
     }
 
     @Override
@@ -49,7 +45,8 @@ public class Main extends JavaPlugin {
         getPluginCommand("locatestructure").setTabCompleter(new LocateStructure());
         getPluginCommand("locatebiome").setExecutor(new LocateBiome());
         getPluginCommand("locatebiome").setTabCompleter(new LocateBiome());
-        getPluginCommand("restartgame").setExecutor(new Restart());
+        getPluginCommand("bradmin").setExecutor(new ArenaAdmin());
+        getPluginCommand("bradmin").setTabCompleter(new ArenaAdmin());
         getPluginCommand("tp").setExecutor(new Teleport());
         getPluginCommand("block").setExecutor(new GetBlock());
         getPluginCommand("block").setTabCompleter(new GetBlock());
@@ -78,11 +75,9 @@ public class Main extends JavaPlugin {
         Message.saveDefaultConfig();
         Message.load();
         LanguageManager.load();
-        top.lqsnow.blockracing.world.ArenaWorldService.init();
-        top.lqsnow.blockracing.world.ArenaWorldService.get()
-                .cleanupOrphansAndPruneBackups(Config.WORLD_PREFIX.getString(), Config.BACKUP_KEEP.getInt());
-        top.lqsnow.blockracing.core.GameManager.init();
-        top.lqsnow.blockracing.core.GameManager.get().createGame();
+        ArenaWorldService.init();
+        GameManager.init();
+        GameManager.get().createGame();
         Team.createTeam();
         Scoreboard.createScoreboard();
         Block.checkBlock();
@@ -95,6 +90,11 @@ public class Main extends JavaPlugin {
             Scoreboard.setPreGameScoreboard();
         }
         GameProgressStore.startAutosave();
+        // Runs after recovery so a world adopted by recovery is not treated as an orphan.
+        ArenaWorldService.get().cleanupOrphansAndPruneBackups(
+                Config.WORLD_PREFIX.getString(), Config.BACKUP_KEEP.getInt());
+        GameManager.get().startWatchdog();
+        GameManager.get().maintainIdleRooms();
 
         if (!recoveredGame) {
             // Only initialize a fresh pregame world. A recovered game must keep

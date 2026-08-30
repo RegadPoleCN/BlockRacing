@@ -52,6 +52,12 @@ public final class GameProgressStore {
             clear();
             return false;
         }
+        // Recovery only makes sense after a crash: the arena world folder must
+        // still exist (a proper game end disposes both state and world).
+        if (!restoreWorld(state)) {
+            clear();
+            return false;
+        }
         try {
             Game.setCurrentGameState(Game.GameState.INGAME);
             Game.setRedTeamScore(state.getInt("scores.red"));
@@ -99,6 +105,32 @@ public final class GameProgressStore {
         }
     }
 
+    private static boolean restoreWorld(YamlConfiguration state) {
+        int arenaId = state.getInt("arena-id", 1);
+        if (arenaId != top.lqsnow.blockracing.core.GameManager.first().getId()) {
+            Main.getInstance().getLogger().warning(
+                    "Saved game belongs to arena " + arenaId + "; only arena "
+                            + top.lqsnow.blockracing.core.GameManager.first().getId() + " can be recovered.");
+            return false;
+        }
+        String prefix = Config.WORLD_PREFIX.getString();
+        String worldName = (prefix == null ? "arena_" : prefix) + arenaId;
+        java.nio.file.Path dataFolder = Main.getInstance().getDataFolder().toPath().toAbsolutePath().normalize();
+        java.nio.file.Path pluginsFolder = dataFolder.getParent();
+        java.nio.file.Path serverRoot = pluginsFolder == null ? null : pluginsFolder.getParent();
+        if (serverRoot == null || !java.nio.file.Files.isDirectory(serverRoot.resolve(worldName))) {
+            Main.getInstance().getLogger().info(
+                    "Arena world " + worldName + " no longer exists; skipping game recovery.");
+            return false;
+        }
+        org.bukkit.World world = Bukkit.createWorld(new org.bukkit.WorldCreator(worldName));
+        if (world == null) {
+            return false;
+        }
+        top.lqsnow.blockracing.core.GameManager.first().adoptWorld(world);
+        return true;
+    }
+
     public static synchronized void saveNow() {
         if (file == null) {
             file = new File(Main.getInstance().getDataFolder(), "game-progress.yml");
@@ -139,6 +171,7 @@ public final class GameProgressStore {
         YamlConfiguration state = new YamlConfiguration();
         state.set("format-version", FORMAT_VERSION);
         state.set("state", Game.getCurrentGameState().name());
+        state.set("arena-id", top.lqsnow.blockracing.core.GameManager.first().getId());
         state.set("scores.red", Game.redTeamScore());
         state.set("scores.blue", Game.blueTeamScore());
         state.set("progress.red-current", Game.redTeamCurrentBlockAmount());
