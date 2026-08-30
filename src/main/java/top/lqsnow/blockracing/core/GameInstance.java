@@ -56,10 +56,7 @@ import top.lqsnow.blockracing.session.SessionManager;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.material.Materials;
 import top.lqsnow.blockracing.toolkit.text.Texts;
-import top.lqsnow.blockracing.utils.CommandUtil;
 import top.lqsnow.blockracing.utils.TranslationUtil;
-
-import static top.lqsnow.blockracing.utils.CommandUtil.sendAll;
 
 /** One running game: teams, target blocks, scores, chests, waypoints and the
  * per-tick loops. Ported from the former static Game/Team/Block state. */
@@ -68,6 +65,7 @@ public class GameInstance {
 
     private final int id;
     private final SessionManager sessions;
+    private final GameBroadcast broadcast;
     private final RoomSettings settings;
     private final BlockCatalog catalog;
     private final TeamState teams = new TeamState();
@@ -104,6 +102,7 @@ public class GameInstance {
     public GameInstance(int id, SessionManager sessions, RoomSettings settings) {
         this.id = id;
         this.sessions = sessions;
+        this.broadcast = new GameBroadcast(this, sessions);
         this.settings = settings;
         this.catalog = BlockCatalog.load(Main.getInstance().getDataFolder());
         initChests();
@@ -215,14 +214,14 @@ public class GameInstance {
     public void playerReady(Player player) {
         if (!readyPlayers.contains(player.getName())) {
             readyPlayers.add(player.getName());
-            sendAll(Message.NOTICE_READY, (viewer, text) -> text.replace("%player%", player.getName()));
+            broadcast.all(Message.NOTICE_READY, (viewer, text) -> text.replace("%player%", player.getName()));
             // Check if the game can start, just notice players
             if (readyPlayers.size() > 1 && readyPlayers.size() == Bukkit.getOnlinePlayers().size()) {
-                sendAll(Message.NOTICE_ALL_READY);
+                broadcast.all(Message.NOTICE_ALL_READY);
             }
         } else {
             readyPlayers.remove(player.getName());
-            sendAll(Message.NOTICE_CANCEL_READY, (viewer, text) -> text.replace("%player%", player.getName()));
+            broadcast.all(Message.NOTICE_CANCEL_READY, (viewer, text) -> text.replace("%player%", player.getName()));
         }
     }
 
@@ -260,7 +259,7 @@ public class GameInstance {
         }
 
         // Start the game
-        sendAll(Message.NOTICE_START);
+        broadcast.all(Message.NOTICE_START);
         start();
     }
 
@@ -381,10 +380,10 @@ public class GameInstance {
         List<String> rollRequesters = rollPlayers(team.get());
         if (!rollRequesters.contains(player.getName())) {
             rollRequesters.add(player.getName());
-            CommandUtil.sendTeam(team.get(), Message.NOTICE_ROLL_REQUEST, (viewer, text) -> text.replace("%player%", player.getName()));
+            broadcast.team(team.get(), Message.NOTICE_ROLL_REQUEST, (viewer, text) -> text.replace("%player%", player.getName()));
         } else {
             rollRequesters.remove(player.getName());
-            CommandUtil.sendTeam(team.get(), Message.NOTICE_ROLL_REQUEST_CANCEL, (viewer, text) -> text.replace("%player%", player.getName()));
+            broadcast.team(team.get(), Message.NOTICE_ROLL_REQUEST_CANCEL, (viewer, text) -> text.replace("%player%", player.getName()));
         }
     }
 
@@ -401,7 +400,7 @@ public class GameInstance {
             addScore(team.get(), -locateCost);
             Scoreboard.updateScoreboard();
             locatePermission.add(player.getName());
-            sendAll(Message.NOTICE_BUY_LOCATE, (viewer, text) -> text.replace("%player%", player.getName()));
+            broadcast.all(Message.NOTICE_BUY_LOCATE, (viewer, text) -> text.replace("%player%", player.getName()));
             player.addAttachment(Main.getInstance(), "minecraft.command.locate", true);
             GameProgressStore.saveNow();
         } else {
@@ -433,7 +432,7 @@ public class GameInstance {
             giveOrDrop(teammate, new ItemStack(Material.FIREWORK_ROCKET, 32));
         }
         TeamColor selectedTeam = team.get();
-        sendAll(Message.NOTICE_SUPPLY_PURCHASED, (viewer, text) -> text
+        broadcast.all(Message.NOTICE_SUPPLY_PURCHASED, (viewer, text) -> text
                 .replace("%player%", buyer.getName())
                 .replace("%team%", selectedTeam == TeamColor.RED
                         ? Message.TEAM_RED_NAME.getString(viewer)
@@ -647,15 +646,15 @@ public class GameInstance {
     private void showRanking() {
         List<Map.Entry<String, Integer>> entries = new ArrayList<>(collectAmount.entrySet());
         entries.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-        sendAll(Message.NOTICE_RANKING);
+        broadcast.all(Message.NOTICE_RANKING);
         for (Map.Entry<String, Integer> entry : entries) {
             java.util.Optional<TeamColor> team = teams.teamOf(entry.getKey());
             var message = team.map(color -> color == TeamColor.RED ? Message.NOTICE_RANKING_RED : Message.NOTICE_RANKING_BLUE)
                     .orElse(Message.NOTICE_RANKING_OFFLINE);
-            sendAll(message, (viewer, text) -> text
+            broadcast.all(message, (viewer, text) -> text
                     .replace("%player%", entry.getKey()).replace("%amount%", entry.getValue().toString()));
         }
-        sendAll(Message.NOTICE_RANKING_DIVIDER);
+        broadcast.all(Message.NOTICE_RANKING_DIVIDER);
     }
 
     private void checkRoll(TeamColor team) {
@@ -669,7 +668,7 @@ public class GameInstance {
             for (int i = 0; i < rollAmount; i++) {
                 blockState.remaining(team).set(i, b.get(random.nextInt(b.size())));
             }
-            sendAll(team == TeamColor.RED ? Message.NOTICE_RED_ROLL_SUCCESS : Message.NOTICE_BLUE_ROLL_SUCCESS);
+            broadcast.all(team == TeamColor.RED ? Message.NOTICE_RED_ROLL_SUCCESS : Message.NOTICE_BLUE_ROLL_SUCCESS);
             addRollCount(team);
             rollPlayers(team).clear();
             Scoreboard.updateScoreboard();
@@ -719,14 +718,14 @@ public class GameInstance {
     public void collectBlock(TeamColor team, String block, String player) {
         boolean collectedFromTeamChest = player.equals(teamChestLabel(team).getString());
         Message collectNotice = team == TeamColor.RED ? Message.NOTICE_RED_COLLECT : Message.NOTICE_BLUE_COLLECT;
-        sendAll(collectNotice, (viewer, text) -> text
+        broadcast.all(collectNotice, (viewer, text) -> text
                 .replace("%block%", TranslationUtil.getValue(block, viewer))
                 .replace("%player%", collectedFromTeamChest
                         ? teamChestLabel(team).getString(viewer)
                         : player));
         Bukkit.getLogger().info(collectNotice.getString()
                 .replace("%block%", TranslationUtil.getValue(block)).replace("%player%", player).replaceAll("§.", ""));
-        playSound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
+        broadcast.sound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
         blockState.complete(team, block);
         if (settings.isSpeedMode())
             addScore(team, 3);
@@ -752,7 +751,7 @@ public class GameInstance {
                 return;
             }
             Message opponentName = team == TeamColor.RED ? Message.TEAM_BLUE_NAME : Message.TEAM_RED_NAME;
-            sendAll(Message.NOTICE_TEAM_CHEST_FULL, (viewer, text) -> text
+            broadcast.all(Message.NOTICE_TEAM_CHEST_FULL, (viewer, text) -> text
                     .replace("%team%", opponentName.getString(viewer))
                     .replace("%block%", TranslationUtil.getValue(block, viewer)));
         }
@@ -773,8 +772,8 @@ public class GameInstance {
             ));
             player.setGameMode(GameMode.SPECTATOR);
         }
-        sendAll(winNotice);
-        playSound(Sound.UI_TOAST_CHALLENGE_COMPLETE);
+        broadcast.all(winNotice);
+        broadcast.sound(Sound.UI_TOAST_CHALLENGE_COMPLETE);
         state = RoomState.ENDING;
         GameProgressStore.clear();
     }
@@ -790,7 +789,7 @@ public class GameInstance {
                 }
             } catch (Exception e) {
                 Bukkit.getLogger().severe(String.format("[BlockRacing] " + Message.NOTICE_ERROR_BLOCK.getString(), str));
-                sendAll(Message.NOTICE_ERROR_BLOCK,
+                broadcast.all(Message.NOTICE_ERROR_BLOCK,
                         (viewer, text) -> String.format(text, str));
                 flag = false;
             }
@@ -809,9 +808,7 @@ public class GameInstance {
     }
 
     public void playSound(Sound sound) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.playSound(player, sound, 1F, 1F);
-        }
+        broadcast.sound(sound);
     }
 
     public String getCoords(Location location) {

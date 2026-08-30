@@ -8,6 +8,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import top.lqsnow.blockracing.Main;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.RoomState;
+import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.toolkit.text.Texts;
 
 import java.util.Set;
@@ -23,15 +27,17 @@ public final class TeamChat {
     }
 
     public static void handle(AsyncChatEvent event) {
-        if (Game.getCurrentGameState() != Game.GameState.INGAME) {
-            return;
-        }
         Player sender = event.getPlayer();
-        boolean red = Team.redTeamPlayers().contains(sender.getName());
-        boolean blue = Team.blueTeamPlayers().contains(sender.getName());
-        if (!red && !blue) {
+        GameInstance arena = GameManager.get().sessions().arenaOf(sender).orElse(null);
+        if (arena == null || arena.getState() != RoomState.RUNNING) {
             return;
         }
+        TeamColor senderTeam = arena.getTeams().teamOf(sender.getName()).orElse(null);
+        if (senderTeam == null) {
+            return;
+        }
+        boolean red = senderTeam == TeamColor.RED;
+        boolean blue = senderTeam == TeamColor.BLUE;
 
         String serialized = LEGACY.serialize(event.message());
         int prefixLength = globalPrefixLength(serialized);
@@ -48,7 +54,7 @@ public final class TeamChat {
             return;
         }
 
-        Set<String> members = red ? Set.copyOf(Team.redTeamPlayers()) : Set.copyOf(Team.blueTeamPlayers());
+        Set<String> members = Set.copyOf(arena.getTeams().players(senderTeam));
         event.viewers().removeIf(viewer -> viewer instanceof Player player
                 && !members.contains(player.getName()));
         Message format = red ? Message.TEAM_RED_CHAT : Message.TEAM_BLUE_CHAT;

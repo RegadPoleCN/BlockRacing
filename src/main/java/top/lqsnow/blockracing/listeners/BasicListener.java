@@ -14,9 +14,7 @@ import top.lqsnow.blockracing.managers.*;
 import top.lqsnow.blockracing.menus.PreGameMenu;
 import top.lqsnow.blockracing.menus.LanguageMenu;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static top.lqsnow.blockracing.managers.Gui.updateMenu;
 import static top.lqsnow.blockracing.managers.Scoreboard.updateScoreboard;
@@ -27,7 +25,10 @@ import static top.lqsnow.blockracing.utils.CommandUtil.sendAll;
 
 public class BasicListener implements Listener {
     private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.legacySection();
-    public static List<String> editAmountPlayer = new CopyOnWriteArrayList<>();
+
+    private static java.util.Set<String> editAmountPlayers() {
+        return top.lqsnow.blockracing.core.GameManager.get().sessions().getEditAmountPlayers();
+    }
 
     @EventHandler
     private void onPlayerJoin(PlayerJoinEvent event) {
@@ -63,7 +64,7 @@ public class BasicListener implements Listener {
         Player player = event.getPlayer();
 
         // Change block amount
-        if (editAmountPlayer.contains(player.getName())) {
+        if (editAmountPlayers().contains(player.getName())) {
             event.setCancelled(true);
             String message = LEGACY_SERIALIZER.serialize(event.message());
             Bukkit.getScheduler().runTask(Main.getInstance(), () -> handleBlockAmountInput(player, message));
@@ -74,19 +75,19 @@ public class BasicListener implements Listener {
     }
 
     private void handleBlockAmountInput(Player player, String message) {
-        if (!editAmountPlayer.contains(player.getName())) return;
+        if (!editAmountPlayers().contains(player.getName())) return;
         if (!Game.getCurrentGameState().equals(Game.GameState.PREGAME)) {
-            editAmountPlayer.remove(player.getName());
+            editAmountPlayers().remove(player.getName());
             return;
         }
         if (message.equalsIgnoreCase("quit")) {
             player.sendMessage(Message.NOTICE_SET_BLOCKS_QUIT.getString(player));
-            editAmountPlayer.remove(player.getName());
+            editAmountPlayers().remove(player.getName());
             return;
         }
         try {
             setBlockAmount(Integer.parseInt(message), true);
-            editAmountPlayer.remove(player.getName());
+            editAmountPlayers().remove(player.getName());
         } catch (NumberFormatException ex) {
             player.sendMessage(Message.NOTICE_SET_BLOCKS_ERROR.getString(player));
         }

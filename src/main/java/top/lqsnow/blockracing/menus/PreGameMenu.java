@@ -15,7 +15,6 @@ import top.lqsnow.blockracing.toolkit.menu.MenuView;
 
 import java.util.Set;
 
-import static top.lqsnow.blockracing.listeners.BasicListener.editAmountPlayer;
 import static top.lqsnow.blockracing.managers.Gui.updateMenu;
 import static top.lqsnow.blockracing.managers.Scoreboard.updateScoreboard;
 import static top.lqsnow.blockracing.managers.Team.redTeam;
@@ -65,7 +64,7 @@ public final class PreGameMenu extends MenuView {
                         .build(),
                 (player, click) -> {
                     player.closeInventory();
-                    editAmountPlayer.add(player.getName());
+                    top.lqsnow.blockracing.core.GameManager.get().sessions().getEditAmountPlayers().add(player.getName());
                     player.sendMessage(Message.NOTICE_SET_BLOCKS.getString(player));
                 }
         ));
