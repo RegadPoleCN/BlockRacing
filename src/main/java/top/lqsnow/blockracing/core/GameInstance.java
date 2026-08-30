@@ -48,6 +48,7 @@ import top.lqsnow.blockracing.game.BlockState;
 import top.lqsnow.blockracing.game.RandomTeleportService;
 import top.lqsnow.blockracing.game.RoomSettings;
 import top.lqsnow.blockracing.game.TeamState;
+import top.lqsnow.blockracing.managers.Config;
 import top.lqsnow.blockracing.managers.GameProgressStore;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
@@ -98,6 +99,7 @@ public class GameInstance {
 
     private BukkitTask waitingTask;
     private BukkitTask tickTask;
+    private World world;
 
     public GameInstance(int id, SessionManager sessions, RoomSettings settings) {
         this.id = id;
@@ -278,7 +280,10 @@ public class GameInstance {
         Scoreboard.updateScoreboard();
         Bukkit.getOnlinePlayers().forEach((Player player) -> freeRandomTp.add(player.getName()));
         tickTask = new RunPer5Tick().runTaskTimer(Main.getInstance(), 0L, 5L);
-        World world = getPrimaryWorld();
+        if (world == null) {
+            world = top.lqsnow.blockracing.world.ArenaWorldService.get()
+                    .createArenaWorld(worldName());
+        }
         world.setDifficulty(Difficulty.EASY);
         world.setTime(1000);
         world.setStorm(false);
@@ -295,6 +300,7 @@ public class GameInstance {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (!teams.contains(player.getName())) {
                 player.setGameMode(GameMode.SPECTATOR);
+                player.teleport(world.getSpawnLocation());
                 player.sendMessage(Message.NOTICE_SPECTATOR.getString(player));
                 inGamePlayers.remove(player.getName());
             }
@@ -453,7 +459,7 @@ public class GameInstance {
 
     // Random Teleport
     public void randomTeleport(Player player, boolean avoidOcean) {
-        World playerWorld = getPrimaryWorld();
+        World playerWorld = gameWorld();
         int maxAttempts = avoidOcean ? 12 : 1;
         startAsyncRandomTeleport(player, playerWorld, avoidOcean, 1, maxAttempts);
     }
@@ -819,9 +825,19 @@ public class GameInstance {
         collectAmount.merge(p, 1, Integer::sum);
     }
 
+    /** The arena world once the game has started; the pregame world before that. */
+    private World gameWorld() {
+        return world != null ? world : getPrimaryWorld();
+    }
+
+    private String worldName() {
+        String prefix = Config.WORLD_PREFIX.getString();
+        return (prefix == null ? "arena_" : prefix) + id;
+    }
+
     private World getPrimaryWorld() {
         return Bukkit.getWorlds().stream()
-                .filter(world -> world.getEnvironment() == World.Environment.NORMAL)
+                .filter(candidate -> candidate.getEnvironment() == World.Environment.NORMAL)
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No overworld is loaded"));
     }

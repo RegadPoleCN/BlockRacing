@@ -43,5 +43,12 @@ max-roll-count: 3
 recovery:
   enabled: true
 
+# 每局游戏的独立世界设置
+# world-prefix - 每局游戏在名为“<world-prefix><编号>”的独立世界中运行
+# backup-keep  - world-backups/ 目录中保留的已回收世界备份数量
+arena:
+  world-prefix: "arena_"
+  backup-keep: 8
+
 # 内部兼容版本，请勿手动修改
 config-version: 26.2.1

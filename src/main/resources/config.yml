@@ -42,5 +42,12 @@ max-roll-count: 3
 recovery:
   enabled: true
 
+# World settings for per-game arenas.
+# world-prefix - each game runs in its own world named "<world-prefix><id>".
+# backup-keep  - how many recycled arena worlds to keep in world-backups/.
+arena:
+  world-prefix: "arena_"
+  backup-keep: 8
+
 # Internal compatibility value. Do not edit this manually.
 config-version: 26.2.1

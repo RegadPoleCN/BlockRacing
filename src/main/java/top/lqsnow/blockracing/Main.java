@@ -78,6 +78,9 @@ public class Main extends JavaPlugin {
         Message.saveDefaultConfig();
         Message.load();
         LanguageManager.load();
+        top.lqsnow.blockracing.world.ArenaWorldService.init();
+        top.lqsnow.blockracing.world.ArenaWorldService.get()
+                .cleanupOrphansAndPruneBackups(Config.WORLD_PREFIX.getString(), Config.BACKUP_KEEP.getInt());
         top.lqsnow.blockracing.core.GameManager.init();
         top.lqsnow.blockracing.core.GameManager.get().createGame();
         Team.createTeam();

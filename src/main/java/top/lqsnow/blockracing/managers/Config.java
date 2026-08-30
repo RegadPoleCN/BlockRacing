@@ -23,7 +23,9 @@ public enum Config {
     MAX_TEAM_CHEST_NUM("max-team-chest-num"),
     MAX_TEAM_WAYPOINT_NUM("max-team-waypoint-num"),
     MAX_ROLL_COUNT("max-roll-count"),
-    RECOVERY_ENABLED("recovery.enabled");
+    RECOVERY_ENABLED("recovery.enabled"),
+    WORLD_PREFIX("arena.world-prefix"),
+    BACKUP_KEEP("arena.backup-keep");
 
     private static File file;
     private static FileConfiguration config;
