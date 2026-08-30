@@ -145,7 +145,6 @@ public class GameInstance {
             Message.NOTICE_WELCOME_LINES.getStringList(player).stream()
                     .map(line -> line.replace("%player%", player.getName()))
                     .forEach(player::sendMessage);
-            player.teleport(getPrimaryWorld().getSpawnLocation());
         } else if (state == RoomState.RUNNING) {
             if (GameProgressStore.hasRecoveredGame()) {
                 Message.NOTICE_RECOVERED_GAME.getStringList(player).forEach(player::sendMessage);
@@ -153,6 +152,7 @@ public class GameInstance {
             // Spectator
             if (!teams.contains(player.getName())) {
                 player.setGameMode(GameMode.SPECTATOR);
+                player.teleport(gameWorld().getSpawnLocation());
                 player.sendMessage(Message.NOTICE_SPECTATOR_JOIN.getString(player));
                 return;
             }
@@ -172,6 +172,29 @@ public class GameInstance {
         }
 
         checkUpdate(player);
+    }
+
+    /** Entry point from the lobby: snapshot, bind and run the login flow. */
+    public void join(Player player) {
+        if (sessions.arenaOf(player).isPresent()) {
+            player.sendMessage(Message.NOTICE_ALREADY_IN_GAME.getString(player));
+            return;
+        }
+        if (state == RoomState.WAITING
+                && playerCount() >= Math.max(1, Config.MAX_PLAYERS.getInt())) {
+            player.sendMessage(Message.NOTICE_ARENA_FULL.getString(player));
+            return;
+        }
+        sessions.saveSession(player);
+        playerLogin(player);
+    }
+
+    /** Back to the lobby: session unbound, snapshot restored. */
+    public void leave(Player player) {
+        playerQuit(player);
+        sessions.leaveArena(player);
+        broadcast.all(Message.NOTICE_LEFT_ARENA, (viewer, text) -> text.replace("%player%", player.getName()));
+        top.lqsnow.blockracing.lobby.Lobby.get().sendToLobby(player);
     }
 
     public void playerQuit(Player player) {
@@ -836,16 +859,18 @@ public class GameInstance {
         if (tickTask != null) {
             tickTask.cancel();
         }
-        List<Player> players = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (sessions.arenaOf(player).map(a -> a == this).orElse(false)) {
-                players.add(player);
-                sessions.leaveArena(player);
+        List<Player> online = new ArrayList<>();
+        for (String name : sessions.boundPlayers(this)) {
+            Player player = Bukkit.getPlayerExact(name);
+            sessions.leaveArena(name);
+            if (player != null) {
+                online.add(player);
             }
         }
         GameManager.get().remove(this);
         GameInstance fresh = GameManager.get().createGame();
-        for (Player player : players) {
+        for (Player player : online) {
+            top.lqsnow.blockracing.lobby.Lobby.get().sendToLobby(player);
             fresh.playerLogin(player);
         }
         if (world != null) {
@@ -854,9 +879,18 @@ public class GameInstance {
         }
     }
 
+    /** Clamps the room's target amount to the currently available pool. */
+    public boolean refreshAvailableBlocksAndClampAmount() {
+        int clamped = BlockCatalog.clampBlockAmount(settings.getBlockAmount(), catalog.maxBlockAmount(settings));
+        if (clamped == settings.getBlockAmount()) {
+            return false;
+        }
+        settings.setBlockAmount(clamped);
+        return true;
+    }
+
     /** Validates the selectable pool for the current settings (original Block.checkBlock). */
-    public boolean validateBlocks() {
-        boolean flag = true;
+    public boolean validateBlocks() {        boolean flag = true;
         for (String str : catalog.pool(settings)) {
             try {
                 Material material = Materials.require(str);
@@ -939,6 +973,28 @@ public class GameInstance {
 
     public TeamState getTeams() {
         return teams;
+    }
+
+    /** Joins the team with the historical messages; syncs scoreboard entries. */
+    public boolean joinTeam(Player player, TeamColor color) {
+        List<String> members = teams.players(color);
+        if (members.contains(player.getName())) {
+            player.sendMessage(color == TeamColor.RED
+                    ? Message.NOTICE_ALREADY_IN_RED.getString(player)
+                    : Message.NOTICE_ALREADY_IN_BLUE.getString(player));
+            return false;
+        }
+        if (!teams.add(player.getName(), color)) {
+            return false;
+        }
+        Scoreboard.syncPlayerTeams();
+        broadcast.all(color == TeamColor.RED ? Message.NOTICE_JOIN_RED : Message.NOTICE_JOIN_BLUE,
+                (viewer, text) -> text.replace("%player%", player.getName()));
+        return true;
+    }
+
+    public GameBroadcast broadcast() {
+        return broadcast;
     }
 
     public BlockState getBlockState() {

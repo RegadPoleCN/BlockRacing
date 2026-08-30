@@ -59,5 +59,9 @@ arena:
   idle-rooms: 1
   max-game-minutes: 240
 
+# 玩家在对局之间等待所在的大厅世界（不存在时自动创建）
+lobby:
+  world: "lobby"
+
 # 内部兼容版本，请勿手动修改
 config-version: 26.2.1

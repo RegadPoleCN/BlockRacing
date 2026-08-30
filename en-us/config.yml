@@ -59,5 +59,9 @@ arena:
   idle-rooms: 1
   max-game-minutes: 240
 
+# Lobby world players wait in between games (created if missing).
+lobby:
+  world: "lobby"
+
 # Internal compatibility value. Do not edit this manually.
 config-version: 26.2.1

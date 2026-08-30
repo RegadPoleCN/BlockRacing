@@ -61,6 +61,14 @@ team:
 
 # Menus
 menu:
+  selector-title: "&0选择游戏"
+  selector-quick-join: "&a快速加入"
+  selector-quick-join-lore: "&7加入第一个可加入的游戏"
+  selector-game-name: "&b游戏 #%id%"
+  selector-game-lore:
+    - "&7状态: &f%state%"
+    - "&7玩家: &f%players%&7/&f%max%"
+    - "&7点击加入"
   pregame-menu:
     title: "&0准备菜单"
     join-red: "&c加入红队"
@@ -179,6 +187,10 @@ rule-book:
 
 # Notices
 notice:
+  arena-full: "&c该游戏已满员！"
+  already-in-game: "&c你已经在一个游戏中！请先离开当前游戏。"
+  not-in-game: "&c你当前不在任何游戏中！"
+  left-arena: "&8[&b游戏&8] &f%player% &7离开了游戏。"
   welcome: "&b&l欢迎来到方块竞速！按Shift+F打开菜单进行选队和准备！如果没反应，请检查潜行和切换副手的快捷键！如果记分板显示的方块名称不完整，可以使用/block <队伍> <编号> 命令来查询！"
   welcome-lines:
     - "&8&m--------------------------------"

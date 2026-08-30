@@ -3,6 +3,7 @@ package top.lqsnow.blockracing.core;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.bukkit.Bukkit;
 
@@ -92,6 +93,10 @@ public final class GameManager {
     /** Ends the "game over" display phase after 10 seconds and recycles the arena. */
     public void scheduleDispose(GameInstance game) {
         Bukkit.getScheduler().runTaskLater(Main.getInstance(), game::dispose, 200L);
+    }
+
+    public Optional<GameInstance> byId(int id) {
+        return Optional.ofNullable(games.get(id));
     }
 
     public void remove(GameInstance game) {

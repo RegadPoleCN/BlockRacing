@@ -60,6 +60,14 @@ team:
 
 # Menu
 menu:
+  selector-title: "&0Select a Game"
+  selector-quick-join: "&aQuick Join"
+  selector-quick-join-lore: "&7Join the first joinable game"
+  selector-game-name: "&bGame #%id%"
+  selector-game-lore:
+    - "&7State: &f%state%"
+    - "&7Players: &f%players%&7/&f%max%"
+    - "&7Click to join"
   pregame-menu:
     title: "&0Preparation Menu"
     join-red: "&cJoin Red Team"
@@ -188,6 +196,10 @@ rule-book:
 
 # Notices
 notice:
+  arena-full: "&cThat game is full!"
+  already-in-game: "&cYou are already in a game! Leave it first."
+  not-in-game: "&cYou are not in a game!"
+  left-arena: "&8[&bGame&8] &f%player% &7left the game."
   welcome: "&b&lWelcome to Block Racing! Press Shift+F to open the menu for team selection and preparation! If there's no response, check the sneak and offhand switch shortcuts! If the block names displayed on the scoreboard are incomplete, you can use the /block <team> <number> command to query!"
   welcome-lines:
     - "&8&m--------------------------------"

@@ -1,9 +1,6 @@
 package top.lqsnow.blockracing;
 
 import org.bukkit.Bukkit;
-import org.bukkit.Difficulty;
-import org.bukkit.GameRules;
-import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 import top.lqsnow.blockracing.commands.*;
 import top.lqsnow.blockracing.core.GameManager;
@@ -34,12 +31,15 @@ public class Main extends JavaPlugin {
         // Register events
         getPluginManager().registerEvents(new BasicListener(), this);
         getPluginManager().registerEvents(new MenuListener(), this);
+        getPluginManager().registerEvents(new top.lqsnow.blockracing.lobby.LobbyListener(), this);
 
         // Register commands
         getPluginCommand("debug").setExecutor(new Debug());
         getPluginCommand("debug").setTabCompleter(new Debug());
         getPluginCommand("menu").setExecutor(new Menu());
         getPluginCommand("menu").setTabCompleter(new Menu());
+        getPluginCommand("arena").setExecutor(new ArenaCommand());
+        getPluginCommand("arena").setTabCompleter(new ArenaCommand());
         getPluginCommand("waypoint").setExecutor(new WayPoint());
         getPluginCommand("locatestructure").setExecutor(new LocateStructure());
         getPluginCommand("locatestructure").setTabCompleter(new LocateStructure());
@@ -95,20 +95,7 @@ public class Main extends JavaPlugin {
                 Config.WORLD_PREFIX.getString(), Config.BACKUP_KEEP.getInt());
         GameManager.get().startWatchdog();
         GameManager.get().maintainIdleRooms();
-
-        if (!recoveredGame) {
-            // Only initialize a fresh pregame world. A recovered game must keep
-            // its world, player positions and border exactly as they were saved.
-            Bukkit.getScheduler().runTaskLater(Main.getInstance(), () -> {
-                World world = getPrimaryWorld();
-                world.setDifficulty(Difficulty.PEACEFUL);
-                Bukkit.getWorlds().forEach(loadedWorld ->
-                        loadedWorld.setGameRule(GameRules.KEEP_INVENTORY, true));
-                world.setTime(1000);
-                world.getWorldBorder().setCenter(world.getSpawnLocation());
-                world.getWorldBorder().setSize(32);
-            }, 5);
-        }
+        top.lqsnow.blockracing.lobby.Lobby.init(GameManager.get().sessions());
 
         // Complete
         Bukkit.getLogger().info("[BlockRacing] Load Complete!");
@@ -134,12 +121,5 @@ public class Main extends JavaPlugin {
                 saveResource(path, false); // 只在缺失时复制，避免 WARNING
             }
         }
-    }
-
-    private World getPrimaryWorld() {
-        return Bukkit.getWorlds().stream()
-                .filter(world -> world.getEnvironment() == World.Environment.NORMAL)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No overworld is loaded"));
     }
 }

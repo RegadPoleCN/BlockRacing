@@ -32,16 +32,26 @@ public class BasicListener implements Listener {
 
     @EventHandler
     private void onPlayerJoin(PlayerJoinEvent event) {
-        Game.playerLogin(event.getPlayer());
-        if (LanguageManager.registerFirstJoin(event.getPlayer())) {
-            LanguageMenu.sendFirstJoinPrompt(event.getPlayer());
+        Player player = event.getPlayer();
+        java.util.Optional<top.lqsnow.blockracing.core.GameInstance> arena =
+                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player);
+        if (arena.isPresent()) {
+            // Rejoin (also mid-game); the arena keeps the binding across disconnects.
+            arena.get().playerLogin(player);
+        } else {
+            top.lqsnow.blockracing.lobby.Lobby.get().joinAsFirst(player);
+        }
+        if (LanguageManager.registerFirstJoin(player)) {
+            LanguageMenu.sendFirstJoinPrompt(player);
         }
     }
 
     @EventHandler
     private void onPlayerQuit(PlayerQuitEvent event) {
-        Game.playerQuit(event.getPlayer());
-        Scoreboard.removePlayer(event.getPlayer());
+        Player player = event.getPlayer();
+        top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player)
+                .ifPresent(arena -> arena.playerQuit(player));
+        Scoreboard.removePlayer(player);
     }
 
     @EventHandler
@@ -58,7 +68,6 @@ public class BasicListener implements Listener {
             Gui.openMenu(event.getPlayer());
         }
     }
-
     @EventHandler
     private void onPlayerChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
@@ -86,7 +95,7 @@ public class BasicListener implements Listener {
             return;
         }
         try {
-            setBlockAmount(Integer.parseInt(message), true);
+            setBlockAmount(player, Integer.parseInt(message), true);
             editAmountPlayers().remove(player.getName());
         } catch (NumberFormatException ex) {
             player.sendMessage(Message.NOTICE_SET_BLOCKS_ERROR.getString(player));
@@ -104,15 +113,19 @@ public class BasicListener implements Listener {
         }, 10L);
     }
 
-    public static void setBlockAmount(int blockAmount, Boolean sendMessage) {
-        blockAmount = Block.clampBlockAmount(blockAmount, Block.maxBlockAmount());
+    public static void setBlockAmount(Player player, int blockAmount, Boolean sendMessage) {
+        top.lqsnow.blockracing.core.GameInstance arena =
+                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player)
+                        .orElse(top.lqsnow.blockracing.core.GameManager.first());
+        blockAmount = Block.clampBlockAmount(blockAmount,
+                arena.getCatalog().maxBlockAmount(arena.getSettings()));
         if (sendMessage) {
             int finalBlockAmount = blockAmount;
             sendAll(Message.NOTICE_SET_BLOCKS_SUCCESS,
                     (viewer, text) -> text + finalBlockAmount);
         }
-        Setting.setBlockAmount(blockAmount);
-        updateMenu(new PreGameMenu());
+        arena.getSettings().setBlockAmount(blockAmount);
+        Gui.updateMenu(new PreGameMenu(arena));
         updateScoreboard();
     }
 }

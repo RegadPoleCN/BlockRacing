@@ -25,6 +25,9 @@ commands:
   menu:
     usage: "/menu"
     description: "Open the menu."
+  arena:
+    usage: "/arena <join|leave|list> [id]"
+    description: "Join or leave a game."
   waypoint:
     usage: "/waypoint"
     description: "Run waypoint commands."

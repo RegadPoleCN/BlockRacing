@@ -30,7 +30,8 @@ public enum Config {
     MAX_PLAYERS("arena.max-players"),
     AUTO_START("arena.auto-start"),
     IDLE_ROOMS("arena.idle-rooms"),
-    MAX_GAME_MINUTES("arena.max-game-minutes");
+    MAX_GAME_MINUTES("arena.max-game-minutes"),
+    LOBBY_WORLD("lobby.world");
 
     private static File file;
     private static FileConfiguration config;

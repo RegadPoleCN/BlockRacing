@@ -43,14 +43,18 @@ public final class Scoreboard {
 
     public static void setPreGameScoreboard() {
         renderPreGame(scoreboard, sidebar, null);
-        PLAYER_BOARDS.forEach((uuid, view) ->
-                renderPreGame(view.scoreboard(), view.sidebar(), Bukkit.getPlayer(uuid)));
+        PLAYER_BOARDS.forEach((uuid, view) -> {
+            Player player = Bukkit.getPlayer(uuid);
+            renderPreGame(view.scoreboard(), view.sidebar(), player);
+        });
     }
 
     public static void setInGameScoreboard() {
         renderInGame(scoreboard, sidebar, null);
-        PLAYER_BOARDS.forEach((uuid, view) ->
-                renderInGame(view.scoreboard(), view.sidebar(), Bukkit.getPlayer(uuid)));
+        PLAYER_BOARDS.forEach((uuid, view) -> {
+            Player player = Bukkit.getPlayer(uuid);
+            renderInGame(view.scoreboard(), view.sidebar(), player);
+        });
     }
 
     public static String getBlockDisplay(String block) {
@@ -118,11 +122,13 @@ public final class Scoreboard {
     }
 
     public static void updateScoreboard() {
-        if (getCurrentGameState().equals(GameState.PREGAME)) {
-            setPreGameScoreboard();
-        } else if (getCurrentGameState().equals(GameState.INGAME)) {
-            setInGameScoreboard();
-        }
+        PLAYER_BOARDS.forEach((uuid, view) -> {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                syncPlayerTeams(view, player);
+                renderCurrent(view, player);
+            }
+        });
     }
 
     private static PlayerBoard createPlayerBoard(Player player) {
@@ -146,7 +152,9 @@ public final class Scoreboard {
     }
 
     private static void renderCurrent(PlayerBoard view, Player player) {
-        if (getCurrentGameState().equals(GameState.INGAME)) {
+        top.lqsnow.blockracing.core.GameInstance arena =
+                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player).orElse(null);
+        if (arena != null && arena.getState() == top.lqsnow.blockracing.core.RoomState.RUNNING) {
             renderInGame(view.scoreboard(), view.sidebar(), player);
         } else {
             renderPreGame(view.scoreboard(), view.sidebar(), player);
@@ -157,18 +165,24 @@ public final class Scoreboard {
                                       Objective objective, Player player) {
         clearLines(board);
 
-        String baseMode = Setting.getCurrentGameMode().equals(Setting.GameMode.NORMAL)
+        top.lqsnow.blockracing.core.GameInstance arena =
+                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player).orElse(null);
+        top.lqsnow.blockracing.game.RoomSettings settings = arena != null
+                ? arena.getSettings()
+                : top.lqsnow.blockracing.core.GameManager.first().getSettings();
+
+        String baseMode = settings.getGameMode().equals(Setting.GameMode.NORMAL)
                 ? text(Message.SCOREBOARD_MODE_NORMAL, player)
                 : text(Message.SCOREBOARD_MODE_RACING, player);
-        String displayedGameMode = Setting.isSpeedMode()
+        String displayedGameMode = settings.isSpeedMode()
                 ? baseMode + " + " + text(Message.SCOREBOARD_MODE_SPEED, player)
                 : baseMode;
 
         String blocks = text(Message.SCOREBOARD_BLOCKS_EASY, player)
-                + (Setting.isEnableMediumBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_MEDIUM, player) : "")
-                + (Setting.isEnableHardBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_HARD, player) : "")
-                + (Setting.isEnableDyedBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_DYED, player) : "")
-                + (Setting.isEnableEndBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_END, player) : "");
+                + (settings.isEnableMediumBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_MEDIUM, player) : "")
+                + (settings.isEnableHardBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_HARD, player) : "")
+                + (settings.isEnableDyedBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_DYED, player) : "")
+                + (settings.isEnableEndBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_END, player) : "");
 
         setTitle(objective, text(Message.SCOREBOARD_PREGAME_TITLE, player));
         Map<Integer, String> lines = new HashMap<>();
@@ -184,7 +198,7 @@ public final class Scoreboard {
             }
             lines.put(slot, originalMessage
                     .replace("%game_mode%", displayedGameMode)
-                    .replace("%block_amount%", String.valueOf(Setting.getBlockAmount()))
+                    .replace("%block_amount%", String.valueOf(settings.getBlockAmount()))
                     .replace("%blocks%", blocks));
         }
         lines.forEach((slot, line) -> setSlot(board, objective, slot, line));
@@ -193,29 +207,34 @@ public final class Scoreboard {
     private static void renderInGame(org.bukkit.scoreboard.Scoreboard board,
                                      Objective objective, Player player) {
         clearLines(board);
+        top.lqsnow.blockracing.core.GameInstance arena =
+                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player).orElse(null);
+        if (arena == null) {
+            arena = top.lqsnow.blockracing.core.GameManager.first();
+        }
         setTitle(objective, text(Message.SCOREBOARD_INGAME_TITLE, player));
         List<String> contentLines = new ArrayList<>();
         String redScore = text(Message.SCOREBOARD_RED_SCORE, player)
-                .replace("%score%", String.valueOf(Game.redTeamScore()))
-                .replace("%current_block%", String.valueOf(Game.redTeamCurrentBlockAmount()))
-                .replace("%total_block%", String.valueOf(Game.redTeamTotalBlockAmount()));
+                .replace("%score%", String.valueOf(arena.getScore(top.lqsnow.blockracing.core.TeamColor.RED)))
+                .replace("%current_block%", String.valueOf(arena.getCurrentAmount(top.lqsnow.blockracing.core.TeamColor.RED)))
+                .replace("%total_block%", String.valueOf(arena.getTotalAmount(top.lqsnow.blockracing.core.TeamColor.RED)));
         contentLines.add(redScore);
         setSlot(board, objective, 11, redScore);
 
-        for (int i = 0; i < getCurrentBlocks("red").size(); i++) {
-            String block = getBlockDisplay(Block.redTeamRemainingBlocks().get(i), player);
+        for (int i = 0; i < arena.currentBlocks(top.lqsnow.blockracing.core.TeamColor.RED).size(); i++) {
+            String block = getBlockDisplay(arena.getBlockState().remaining(top.lqsnow.blockracing.core.TeamColor.RED).get(i), player);
             contentLines.add(block);
             setSlot(board, objective, 10 - i, block);
         }
         String blueScore = text(Message.SCOREBOARD_BLUE_SCORE, player)
-                .replace("%score%", String.valueOf(Game.blueTeamScore()))
-                .replace("%current_block%", String.valueOf(Game.blueTeamCurrentBlockAmount()))
-                .replace("%total_block%", String.valueOf(Game.blueTeamTotalBlockAmount()));
+                .replace("%score%", String.valueOf(arena.getScore(top.lqsnow.blockracing.core.TeamColor.BLUE)))
+                .replace("%current_block%", String.valueOf(arena.getCurrentAmount(top.lqsnow.blockracing.core.TeamColor.BLUE)))
+                .replace("%total_block%", String.valueOf(arena.getTotalAmount(top.lqsnow.blockracing.core.TeamColor.BLUE)));
         contentLines.add(blueScore);
         setSlot(board, objective, 5, blueScore);
 
-        for (int i = 0; i < getCurrentBlocks("blue").size(); i++) {
-            String block = getBlockDisplay(Block.blueTeamRemainingBlocks().get(i), player);
+        for (int i = 0; i < arena.currentBlocks(top.lqsnow.blockracing.core.TeamColor.BLUE).size(); i++) {
+            String block = getBlockDisplay(arena.getBlockState().remaining(top.lqsnow.blockracing.core.TeamColor.BLUE).get(i), player);
             contentLines.add(block);
             setSlot(board, objective, 4 - i, block);
         }
@@ -231,8 +250,16 @@ public final class Scoreboard {
 
         new HashSet<>(red.getEntries()).forEach(red::removeEntry);
         new HashSet<>(blue.getEntries()).forEach(blue::removeEntry);
-        top.lqsnow.blockracing.managers.Team.redTeamPlayers().forEach(red::addEntry);
-        top.lqsnow.blockracing.managers.Team.blueTeamPlayers().forEach(blue::addEntry);
+        top.lqsnow.blockracing.core.GameInstance arena =
+                top.lqsnow.blockracing.core.GameManager.get().sessions().arenaOf(player).orElse(null);
+        List<String> redEntries = arena != null
+                ? arena.getTeams().players(top.lqsnow.blockracing.core.TeamColor.RED)
+                : top.lqsnow.blockracing.managers.Team.redTeamPlayers();
+        List<String> blueEntries = arena != null
+                ? arena.getTeams().players(top.lqsnow.blockracing.core.TeamColor.BLUE)
+                : top.lqsnow.blockracing.managers.Team.blueTeamPlayers();
+        redEntries.forEach(red::addEntry);
+        blueEntries.forEach(blue::addEntry);
         localizeTeam(red, Message.TEAM_RED_NAME, Message.TEAM_RED_PREFIX, player);
         localizeTeam(blue, Message.TEAM_BLUE_NAME, Message.TEAM_BLUE_PREFIX, player);
     }

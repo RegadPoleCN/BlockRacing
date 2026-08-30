@@ -9,19 +9,19 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.managers.Game;
 import top.lqsnow.blockracing.managers.Gui;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
-import top.lqsnow.blockracing.managers.Setting;
 import top.lqsnow.blockracing.menus.GameMenu;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static top.lqsnow.blockracing.managers.Game.*;
-import static top.lqsnow.blockracing.managers.Team.*;
-import static top.lqsnow.blockracing.utils.CommandUtil.sendAll;
 
 public class Menu implements CommandExecutor, TabCompleter {
     @Override
@@ -33,6 +33,12 @@ public class Menu implements CommandExecutor, TabCompleter {
 
         if (Game.getCurrentGameState().equals(Game.GameState.END)) return true;
 
+        GameInstance arena = GameManager.get().sessions().arenaOf(player).orElse(null);
+        if (arena == null) {
+            player.sendMessage(Message.NOTICE_NOT_IN_GAME.getString(player));
+            return true;
+        }
+
         if (args.length == 0 || (args.length == 1 && args[0].equalsIgnoreCase("main"))) {
             Gui.openMenu(player);
             return true;
@@ -43,58 +49,52 @@ public class Menu implements CommandExecutor, TabCompleter {
                 player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
                 return true;
             }
-            if (Game.getCurrentGameState().equals(Game.GameState.PREGAME)) {
+            if (arena.getState() == top.lqsnow.blockracing.core.RoomState.WAITING) {
                 player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
                 return true;
             }
-            if (redTeamPlayers().contains(player.getName())) {
-                if (args.length == 1) {
-                    new GameMenu.TeamChestSelectMenu().open(player);
-                    return true;
-                }
-                Integer ith = parseIndex(args[1], redTeamChest().size());
-                if (ith == null) {
-                    player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
-                    return true;
-                }
-                Gui.openTeamChest(player, ith - 1);
-            } else if (blueTeamPlayers().contains(player.getName())) {
-                if (args.length == 1) {
-                    new GameMenu.TeamChestSelectMenu().open(player);
-                    return true;
-                }
-                Integer ith = parseIndex(args[1], blueTeamChest().size());
-                if (ith == null) {
-                    player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
-                    return true;
-                }
-                Gui.openTeamChest(player, ith - 1);
+            TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
+            if (team == null) {
+                return true;
             }
+            if (args.length == 1) {
+                new GameMenu.TeamChestSelectMenu(arena).open(player);
+                return true;
+            }
+            Integer ith = parseIndex(args[1], arena.chests(team).size());
+            if (ith == null) {
+                player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
+                return true;
+            }
+            Gui.openTeamChest(player, ith - 1);
             return true;
         }
 
         if (args[0].equalsIgnoreCase("waypoints")) {
-            if (Game.getCurrentGameState().equals(Game.GameState.PREGAME)) {
+            if (arena.getState() == top.lqsnow.blockracing.core.RoomState.WAITING) {
                 player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
                 return true;
             }
 
             if (args.length == 1) {
-                if (redTeamPlayers().contains(player.getName())) {
-                    new GameMenu.WayPointMenu(redWaypoint(), redWaypointIconCache()).open(player);
-                } else if (blueTeamPlayers().contains(player.getName())) {
-                    new GameMenu.WayPointMenu(blueWaypoint(), blueWaypointIconCache()).open(player);
+                TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
+                if (team == TeamColor.RED) {
+                    new GameMenu.WayPointMenu(arena.waypoints(TeamColor.RED),
+                            arena.waypointIcons(TeamColor.RED), arena).open(player);
+                } else if (team == TeamColor.BLUE) {
+                    new GameMenu.WayPointMenu(arena.waypoints(TeamColor.BLUE),
+                            arena.waypointIcons(TeamColor.BLUE), arena).open(player);
                 }
                 return true;
             }
 
             if (args.length == 3 && args[1].equalsIgnoreCase("use")) {
-                Integer index = parseIndex(args[2], Setting.getMaxTeamWaypointNum());
+                Integer index = parseIndex(args[2], arena.getSettings().getMaxTeamWaypointNum());
                 if (index == null) {
                     player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
                     return true;
                 }
-                waypoint(player, index, ClickType.LEFT);
+                arena.waypoint(player, index, ClickType.LEFT);
             } else {
                 player.sendMessage(Message.NOTICE_ERROR_COMMAND.getString(player));
             }
@@ -102,53 +102,45 @@ public class Menu implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("roll") && args.length == 1) {
-            if (Game.getCurrentGameState().equals(Game.GameState.PREGAME)) {
+            if (arena.getState() == top.lqsnow.blockracing.core.RoomState.WAITING) {
                 player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
                 return true;
             }
-            roll(player);
+            arena.roll(player);
             return true;
         }
 
         if (args[0].equalsIgnoreCase("locate") && args.length == 1) {
-            if (Game.getCurrentGameState().equals(Game.GameState.PREGAME)) {
+            if (arena.getState() == top.lqsnow.blockracing.core.RoomState.WAITING) {
                 player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
                 return true;
             }
-            locate(player);
+            arena.locate(player);
             return true;
         }
 
         if (args[0].equalsIgnoreCase("randomTP") && args.length == 1) {
-            if (Game.getCurrentGameState().equals(Game.GameState.PREGAME)) {
+            if (arena.getState() == top.lqsnow.blockracing.core.RoomState.WAITING) {
                 player.sendMessage(Message.NOTICE_GAME_NOT_START.getString(player));
                 return true;
             }
-            if (freeRandomTPList().contains(player.getName())) {
-                Game.randomTeleport(player, false);
-                freeRandomTPList().remove(player.getName());
+            TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
+            if (arena.getFreeRandomTp().contains(player.getName())) {
+                arena.randomTeleport(player, false);
+                arena.getFreeRandomTp().remove(player.getName());
             } else {
-                if (redTeamPlayers().contains(player.getName())) {
-                    if (redTeamScore() < 2) {
-                        player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
-                        return true;
-                    }
-                } else if (blueTeamPlayers().contains(player.getName())) {
-                    if (blueTeamScore() < 2) {
-                        player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
-                        return true;
-                    }
+                if (team != null && arena.getScore(team) < 2) {
+                    player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
+                    return true;
                 }
                 player.closeInventory();
-                randomTeleport(player, false);
-                if (redTeamPlayers().contains(player.getName())) {
-                    Game.setRedTeamScore(redTeamScore() - 2);
-                    sendAll(Message.NOTICE_RANDOM_TP, (viewer, text) -> text.replace("%player%",
-                            Message.TEAM_RED_COLOR.getString(viewer) + player.getName()));
-                } else if (blueTeamPlayers().contains(player.getName())) {
-                    Game.setBlueTeamScore(blueTeamScore() - 2);
-                    sendAll(Message.NOTICE_RANDOM_TP, (viewer, text) -> text.replace("%player%",
-                            Message.TEAM_BLUE_COLOR.getString(viewer) + player.getName()));
+                arena.randomTeleport(player, false);
+                if (team != null) {
+                    arena.addScore(team, -2);
+                    arena.broadcast().all(Message.NOTICE_RANDOM_TP, (viewer, text) -> text.replace("%player%",
+                            (team == TeamColor.RED
+                                    ? Message.TEAM_RED_COLOR.getString(viewer)
+                                    : Message.TEAM_BLUE_COLOR.getString(viewer)) + player.getName()));
                 }
                 Scoreboard.updateScoreboard();
             }
@@ -180,13 +172,13 @@ public class Menu implements CommandExecutor, TabCompleter {
             completions.add("locate");
             completions.add("randomTP");
         } else if (args.length == 2 && args[0].equalsIgnoreCase("chest")) {
-            for(int i = 1; i <= Setting.getMaxTeamChestNum(); i++){
+            for (int i = 1; i <= GameManager.first().getSettings().getMaxTeamChestNum(); i++) {
                 completions.add(Integer.toString(i));
             }
         } else if (args.length == 2 && args[0].equalsIgnoreCase("waypoints")) {
             completions.add("use");
         } else if (args.length == 3 && args[0].equalsIgnoreCase("waypoints")) {
-            for(int i = 1; i <= Setting.getMaxTeamWaypointNum(); i++){
+            for (int i = 1; i <= GameManager.first().getSettings().getMaxTeamWaypointNum(); i++) {
                 completions.add(Integer.toString(i));
             }
         }

@@ -1,7 +1,15 @@
 package top.lqsnow.blockracing.managers;
 
+import java.util.Optional;
+
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.RoomState;
+import top.lqsnow.blockracing.core.TeamColor;
+import top.lqsnow.blockracing.lobby.GameSelectorMenu;
 import top.lqsnow.blockracing.menus.GameMenu;
 import top.lqsnow.blockracing.menus.PreGameMenu;
 import top.lqsnow.blockracing.toolkit.menu.MenuManager;
@@ -9,25 +17,36 @@ import top.lqsnow.blockracing.toolkit.menu.MenuView;
 
 public class Gui {
     public static void openMenu(Player player) {
-        if (Game.getCurrentGameState().equals(Game.GameState.PREGAME)) new PreGameMenu().open(player);
-        if (Game.getCurrentGameState().equals(Game.GameState.INGAME)) new GameMenu().open(player);
+        Optional<GameInstance> arena = GameManager.get().sessions().arenaOf(player);
+        if (arena.isEmpty()) {
+            new GameSelectorMenu().open(player);
+            return;
+        }
+        if (arena.get().getState() == RoomState.RUNNING) {
+            new GameMenu(arena.get()).open(player);
+        } else {
+            new PreGameMenu(arena.get()).open(player);
+        }
     }
 
     @SuppressWarnings("deprecation") // InventoryView has no component-based title setter in Paper 26.2.
     public static void openTeamChest(Player player, int index) {
-        if (Team.redTeamPlayers().contains(player.getName())) {
-            player.openInventory(Game.redTeamChest().get(index));
-            player.getOpenInventory().setTitle(Message.MENU_RED_CHEST.getString(player) + (index + 1));
-        } else if (Team.blueTeamPlayers().contains(player.getName())) {
-            player.openInventory(Game.blueTeamChest().get(index));
-            player.getOpenInventory().setTitle(Message.MENU_BLUE_CHEST.getString(player) + (index + 1));
+        Optional<GameInstance> arena = GameManager.get().sessions().arenaOf(player);
+        if (arena.isEmpty()) {
+            return;
         }
+        TeamColor color = arena.get().getTeams().teamOf(player.getName()).orElse(null);
+        if (color == null) {
+            return;
+        }
+        player.openInventory(arena.get().chests(color).get(index));
+        player.getOpenInventory().setTitle(color == TeamColor.RED
+                ? Message.MENU_RED_CHEST.getString(player) + (index + 1)
+                : Message.MENU_BLUE_CHEST.getString(player) + (index + 1));
     }
 
     public static void closeAllPlayersMenu() {
-        Bukkit.getOnlinePlayers().forEach((Player player) -> {
-            player.closeInventory();
-        });
+        Bukkit.getOnlinePlayers().forEach(Player::closeInventory);
     }
 
     // Update menu

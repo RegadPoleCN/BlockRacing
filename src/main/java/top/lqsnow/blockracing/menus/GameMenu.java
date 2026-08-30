@@ -2,17 +2,17 @@ package top.lqsnow.blockracing.menus;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
-import top.lqsnow.blockracing.managers.Game;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.managers.GameProgressStore;
 import top.lqsnow.blockracing.managers.LanguageManager;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
-import top.lqsnow.blockracing.managers.Setting;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.menu.MenuButton;
 import top.lqsnow.blockracing.toolkit.menu.MenuView;
@@ -23,22 +23,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-import static top.lqsnow.blockracing.managers.Game.*;
-import static top.lqsnow.blockracing.managers.Gui.openTeamChest;
-import static top.lqsnow.blockracing.managers.Gui.updateMenu;
-import top.lqsnow.blockracing.managers.Team;
-import top.lqsnow.blockracing.utils.CommandUtil;
-
 public final class GameMenu extends MenuView {
-    public GameMenu() {
+    private final GameInstance arena;
+
+    public GameMenu(GameInstance arena) {
         super(36, player -> Message.MENU_GAME_TITLE.getString(player));
+        this.arena = arena;
 
         setButton(10, MenuButton.of(
                 player -> ItemBuilder.of(Material.CHEST)
                         .name(Message.MENU_TEAM_CHEST.getString(player))
                         .lore(Message.MENU_TEAM_CHEST_LORE.getStringList(player))
                         .build(),
-                (player, click) -> new TeamChestSelectMenu().open(player)
+                (player, click) -> new TeamChestSelectMenu(arena).open(player)
         ));
         setButton(12, MenuButton.of(
                 player -> ItemBuilder.of(Material.TOTEM_OF_UNDYING)
@@ -46,7 +43,7 @@ public final class GameMenu extends MenuView {
                         .lore(List.of(rollLore(player)))
                         .build(),
                 (player, click) -> {
-                    Game.roll(player);
+                    arena.roll(player);
                     player.closeInventory();
                 }
         ));
@@ -56,7 +53,7 @@ public final class GameMenu extends MenuView {
                         .lore(replaceScorePlaceholder(Message.MENU_LOCATE_LORE.getStringList(player)))
                         .build(),
                 (player, click) -> {
-                    Game.locate(player);
+                    arena.locate(player);
                     player.closeInventory();
                 }
         ));
@@ -66,10 +63,11 @@ public final class GameMenu extends MenuView {
                         .lore(Message.MENU_WAYPOINTS_LORE.getStringList(player))
                         .build(),
                 (player, click) -> {
-                    if (Team.redTeamPlayers().contains(player.getName())) {
-                        new WayPointMenu(Game.redWaypoint(), Game.redWaypointIconCache()).open(player);
-                    } else if (Team.blueTeamPlayers().contains(player.getName())) {
-                        new WayPointMenu(Game.blueWaypoint(), Game.blueWaypointIconCache()).open(player);
+                    TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
+                    if (team == TeamColor.RED) {
+                        new WayPointMenu(arena.waypoints(TeamColor.RED), arena.waypointIcons(TeamColor.RED), arena).open(player);
+                    } else if (team == TeamColor.BLUE) {
+                        new WayPointMenu(arena.waypoints(TeamColor.BLUE), arena.waypointIcons(TeamColor.BLUE), arena).open(player);
                     }
                 }
         ));
@@ -85,7 +83,7 @@ public final class GameMenu extends MenuView {
                         .name(Message.MENU_TEAMMATE_TELEPORT.getString(player))
                         .lore(Message.MENU_TEAMMATE_TELEPORT_LORE.getStringList(player))
                         .build(),
-                (player, click) -> new TeammateTeleportMenu(player).open(player)
+                (player, click) -> new TeammateTeleportMenu(player, arena).open(player)
         ));
         setButton(23, MenuButton.of(
                 player -> ItemBuilder.of(Material.WRITABLE_BOOK)
@@ -101,7 +99,7 @@ public final class GameMenu extends MenuView {
                         .build(),
                 (player, click) -> new LanguageMenu().open(player)
         ));
-        if (Setting.isSpeedMode()) {
+        if (arena.getSettings().isSpeedMode()) {
             setButton(31, MenuButton.of(
                     player -> ItemBuilder.of(Material.FIREWORK_ROCKET)
                             .name(Message.MENU_SUPPLY.getString(player))
@@ -109,7 +107,7 @@ public final class GameMenu extends MenuView {
                             .flags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
                             .build(),
                     (player, click) -> {
-                        Game.buySupply(player);
+                        arena.buySupply(player);
                         player.closeInventory();
                     }
             ));
@@ -124,19 +122,19 @@ public final class GameMenu extends MenuView {
         return ItemBuilder.of(material).name(" ").build();
     }
 
-    private static void showCurrentBlocks(Player player) {
+    private void showCurrentBlocks(Player player) {
         player.closeInventory();
         player.sendMessage(Message.NOTICE_BLOCK_OVERVIEW_DIVIDER.getString(player));
         player.sendMessage(Message.NOTICE_BLOCK_OVERVIEW_TITLE.getString(player));
         player.sendMessage(Message.NOTICE_BLOCK_OVERVIEW_RED.getString(player));
-        sendBlockSection(player, getCurrentBlocks("red"));
+        sendBlockSection(player, arena.currentBlocks(TeamColor.RED));
         player.sendMessage(Message.NOTICE_BLOCK_OVERVIEW_DIVIDER.getString(player));
         player.sendMessage(Message.NOTICE_BLOCK_OVERVIEW_BLUE.getString(player));
-        sendBlockSection(player, getCurrentBlocks("blue"));
+        sendBlockSection(player, arena.currentBlocks(TeamColor.BLUE));
         player.sendMessage(Message.NOTICE_BLOCK_OVERVIEW_DIVIDER.getString(player));
     }
 
-    private static void sendBlockSection(Player player, List<String> blocks) {
+    private void sendBlockSection(Player player, List<String> blocks) {
         for (int index = 0; index < blocks.size(); index++) {
             String block = blocks.get(index);
             player.sendMessage(Message.NOTICE_BLOCK_OVERVIEW_ENTRY.getString(player)
@@ -146,58 +144,55 @@ public final class GameMenu extends MenuView {
     }
 
     private void handleRandomTeleport(Player player) {
-        if (freeRandomTPList().remove(player.getName())) {
-            Game.randomTeleport(player, false);
+        if (arena.getFreeRandomTp().remove(player.getName())) {
+            arena.randomTeleport(player, false);
             return;
         }
 
-        if (Team.redTeamPlayers().contains(player.getName()) && redTeamScore() < 2
-                || Team.blueTeamPlayers().contains(player.getName()) && blueTeamScore() < 2) {
+        TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
+        if (team != null && arena.getScore(team) < 2) {
             player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
             return;
         }
 
         player.closeInventory();
-        randomTeleport(player, false);
-        if (Team.redTeamPlayers().contains(player.getName())) {
-            Game.setRedTeamScore(redTeamScore() - 2);
-            CommandUtil.sendAll(Message.NOTICE_RANDOM_TP,
+        arena.randomTeleport(player, false);
+        if (team != null) {
+            arena.addScore(team, -2);
+            arena.broadcast().all(Message.NOTICE_RANDOM_TP,
                     (viewer, text) -> text.replace("%player%",
-                            Message.TEAM_RED_COLOR.getString(viewer) + player.getName()));
-        } else if (Team.blueTeamPlayers().contains(player.getName())) {
-            Game.setBlueTeamScore(blueTeamScore() - 2);
-            CommandUtil.sendAll(Message.NOTICE_RANDOM_TP,
-                    (viewer, text) -> text.replace("%player%",
-                            Message.TEAM_BLUE_COLOR.getString(viewer) + player.getName()));
+                            (team == TeamColor.RED
+                                    ? Message.TEAM_RED_COLOR.getString(viewer)
+                                    : Message.TEAM_BLUE_COLOR.getString(viewer)) + player.getName()));
         }
         Scoreboard.updateScoreboard();
         GameProgressStore.saveNow();
     }
 
     public static final class TeamChestSelectMenu extends MenuView {
-        public TeamChestSelectMenu() {
-            super(menuSize(Setting.getMaxTeamChestNum()),
+        public TeamChestSelectMenu(GameInstance arena) {
+            super(menuSize(arena.getSettings().getMaxTeamChestNum()),
                     player -> Message.MENU_TEAM_CHEST_SELECT_TITLE.getString(player));
 
-            for (int slot = 0; slot < Setting.getMaxTeamChestNum(); slot++) {
+            for (int slot = 0; slot < arena.getSettings().getMaxTeamChestNum(); slot++) {
                 int chestIndex = slot;
                 setButton(slot, MenuButton.of(
                         player -> ItemBuilder.of(Material.CHEST)
                                 .name(Message.MENU_TEAM_CHEST_SELECT_CHEST.getString(player) + (chestIndex + 1))
                                 .build(),
-                        (player, click) -> openTeamChest(player, chestIndex)
+                        (player, click) -> GuiBridge.openTeamChest(player, chestIndex)
                 ));
             }
-            setButton(getSize() - 1, backButton());
+            setButton(getSize() - 1, backButton(arena));
         }
     }
 
     public static final class TeammateTeleportMenu extends MenuView {
-        public TeammateTeleportMenu(Player viewer) {
-            this(getOnlineTeammates(viewer));
+        public TeammateTeleportMenu(Player viewer, GameInstance arena) {
+            this(getOnlineTeammates(viewer, arena), arena);
         }
 
-        private TeammateTeleportMenu(List<Player> teammates) {
+        private TeammateTeleportMenu(List<Player> teammates, GameInstance arena) {
             super(menuSize(Math.max(1, teammates.size())),
                     player -> Message.MENU_TEAMMATE_TELEPORT_TITLE.getString(player));
 
@@ -215,36 +210,38 @@ public final class GameMenu extends MenuView {
                     Player teammate = teammates.get(slot);
                     setButton(slot, MenuButton.of(
                             player -> teammateHead(teammate, player),
-                            (player, click) -> teleportToTeammate(player, teammate.getName())
+                            (player, click) -> teleportToTeammate(player, teammate.getName(), arena)
                     ));
                 }
             }
-            setButton(getSize() - 1, backButton());
+            setButton(getSize() - 1, backButton(arena));
         }
     }
 
     public static final class WayPointMenu extends MenuView {
         private final Map<Integer, Location> waypoints;
         private final Map<Integer, Material> iconCache;
+        private final GameInstance arena;
 
-        public WayPointMenu(Map<Integer, Location> waypoints, Map<Integer, Material> iconCache) {
-            super(menuSize(Setting.getMaxTeamWaypointNum()),
+        public WayPointMenu(Map<Integer, Location> waypoints, Map<Integer, Material> iconCache, GameInstance arena) {
+            super(menuSize(arena.getSettings().getMaxTeamWaypointNum()),
                     player -> Message.MENU_WAYPOINT_TITLE.getString(player));
             this.waypoints = waypoints;
             this.iconCache = iconCache;
+            this.arena = arena;
 
-            for (int slot = 0; slot < Setting.getMaxTeamWaypointNum(); slot++) {
+            for (int slot = 0; slot < arena.getSettings().getMaxTeamWaypointNum(); slot++) {
                 int index = slot + 1;
                 setButton(slot, MenuButton.of(
                         player -> createWaypointItem(player, index),
                         (player, click) -> {
-                            if (waypoint(player, index, click)) {
-                                updateMenu(this);
+                            if (arena.waypoint(player, index, click)) {
+                                GuiBridge.updateMenu(this);
                             }
                         }
                 ));
             }
-            setButton(getSize() - 1, backButton());
+            setButton(getSize() - 1, backButton(arena));
         }
 
         private ItemStack createWaypointItem(Player player, int index) {
@@ -264,7 +261,7 @@ public final class GameMenu extends MenuView {
                         .lore(replaceWaypointPlaceholders(
                                 Message.MENU_WAYPOINT_FILLED_LORE.getStringList(player),
                                 waypoint.getWorld().getName(),
-                                getCoords(waypoint),
+                                arena.getCoords(waypoint),
                                 waypoint.getBlock().getBiome().getKey().getKey()
                         ))
                         .build();
@@ -275,7 +272,7 @@ public final class GameMenu extends MenuView {
                         .lore(replaceWaypointPlaceholders(
                                 Message.MENU_WAYPOINT_FILLED_LORE.getStringList(player),
                                 waypoint.getWorld().getName(),
-                                getCoords(waypoint),
+                                arena.getCoords(waypoint),
                                 waypoint.getBlock().getBiome().getKey().getKey()
                         ))
                         .build();
@@ -283,7 +280,7 @@ public final class GameMenu extends MenuView {
         }
 
         private Material findWaypointIcon(Location waypoint) {
-            Block block = waypoint.getBlock();
+            org.bukkit.block.Block block = waypoint.getBlock();
             while (block.isEmpty() && block.getY() > block.getWorld().getMinHeight()) {
                 block = block.getRelative(0, -1, 0);
             }
@@ -299,24 +296,24 @@ public final class GameMenu extends MenuView {
         }
     }
 
-    private static MenuButton backButton() {
+    private static MenuButton backButton(GameInstance arena) {
         return MenuButton.of(
                 player -> ItemBuilder.of(Material.ARROW)
                         .name(Message.MENU_ALL_RETURN_BACK.getString(player))
                         .build(),
-                (player, click) -> new GameMenu().open(player)
+                (player, click) -> new GameMenu(arena).open(player)
         );
     }
 
-    private static List<Player> getOnlineTeammates(Player player) {
-        List<String> team = Team.redTeamPlayers().contains(player.getName())
-                ? Team.redTeamPlayers()
-                : Team.blueTeamPlayers().contains(player.getName()) ? Team.blueTeamPlayers() : List.of();
+    private static List<Player> getOnlineTeammates(Player player, GameInstance arena) {
+        TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
         List<Player> teammates = new ArrayList<>();
-        for (String name : team) {
-            Player teammate = org.bukkit.Bukkit.getPlayerExact(name);
-            if (teammate != null && teammate.isOnline() && !teammate.equals(player)) {
-                teammates.add(teammate);
+        if (team != null) {
+            for (String name : arena.getTeams().players(team)) {
+                Player teammate = org.bukkit.Bukkit.getPlayerExact(name);
+                if (teammate != null && teammate.isOnline() && !teammate.equals(player)) {
+                    teammates.add(teammate);
+                }
             }
         }
         teammates.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
@@ -335,16 +332,16 @@ public final class GameMenu extends MenuView {
                 .build();
     }
 
-    private static void teleportToTeammate(Player player, String targetName) {
+    private static void teleportToTeammate(Player player, String targetName, GameInstance arena) {
         Player target = org.bukkit.Bukkit.getPlayerExact(targetName);
         if (target == null || !target.isOnline()) {
             player.sendMessage(Message.NOTICE_PLAYER_NOT_EXIST.getString(player));
             player.closeInventory();
             return;
         }
-        boolean sameTeam = Team.redTeamPlayers().contains(player.getName()) && Team.redTeamPlayers().contains(targetName)
-                || Team.blueTeamPlayers().contains(player.getName()) && Team.blueTeamPlayers().contains(targetName);
-        if (!sameTeam) {
+        TeamColor playerTeam = arena.getTeams().teamOf(player.getName()).orElse(null);
+        TeamColor targetTeam = arena.getTeams().teamOf(targetName).orElse(null);
+        if (playerTeam == null || playerTeam != targetTeam) {
             player.sendMessage(Message.NOTICE_PLAYER_NOT_IN_SAME_TEAM.getString(player));
             player.closeInventory();
             return;
@@ -359,20 +356,20 @@ public final class GameMenu extends MenuView {
         return Math.min(54, ((contentSlots / 9) + 1) * 9);
     }
 
-    private static List<String> replaceScorePlaceholder(List<String> lore) {
+    private List<String> replaceScorePlaceholder(List<String> lore) {
         return lore.stream()
-                .map(line -> line.replace("%score%", String.valueOf(locateCost())))
+                .map(line -> line.replace("%score%", String.valueOf(arena.getLocateCost())))
                 .toList();
     }
 
-    private static String rollLore(Player player) {
+    private String rollLore(Player player) {
         String lore = Message.MENU_ROLL_LORE.getString(player);
         if (!lore.contains("%count%")) {
             lore = LanguageManager.usesChinese(player)
                     ? "§b替换当前目标方块（每局每队最多 %count% 次）"
                     : "§bReplace current targets (up to %count% times per team)";
         }
-        return lore.replace("%count%", String.valueOf(Setting.getMaxRollCount()));
+        return lore.replace("%count%", String.valueOf(arena.getSettings().getMaxRollCount()));
     }
 
     private static List<String> replaceWaypointPlaceholders(List<String> lore, String dimension,
@@ -383,5 +380,16 @@ public final class GameMenu extends MenuView {
                         .replace("%coords%", coords)
                         .replace("%biome%", biome))
                 .toList();
+    }
+
+    /** Indirection so the nested menus can reach Gui without a managed cycle. */
+    private static final class GuiBridge {
+        static void openTeamChest(Player player, int index) {
+            top.lqsnow.blockracing.managers.Gui.openTeamChest(player, index);
+        }
+
+        static void updateMenu(MenuView menu) {
+            top.lqsnow.blockracing.managers.Gui.updateMenu(menu);
+        }
     }
 }

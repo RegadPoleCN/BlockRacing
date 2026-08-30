@@ -3,12 +3,14 @@ package top.lqsnow.blockracing.menus;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+
 import top.lqsnow.blockracing.commands.RandomTeam;
-import top.lqsnow.blockracing.managers.Block;
-import top.lqsnow.blockracing.managers.Game;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.TeamColor;
+import top.lqsnow.blockracing.game.RoomSettings;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Setting;
-import top.lqsnow.blockracing.managers.Team;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.menu.MenuButton;
 import top.lqsnow.blockracing.toolkit.menu.MenuView;
@@ -17,7 +19,6 @@ import java.util.Set;
 
 import static top.lqsnow.blockracing.managers.Gui.updateMenu;
 import static top.lqsnow.blockracing.managers.Scoreboard.updateScoreboard;
-import static top.lqsnow.blockracing.managers.Team.redTeam;
 
 public final class PreGameMenu extends MenuView {
     private static final Set<Integer> GREEN_BACKGROUND = Set.of(
@@ -26,65 +27,69 @@ public final class PreGameMenu extends MenuView {
     );
     private static final Set<Integer> BLUE_BACKGROUND = Set.of(13, 14, 15, 31, 32, 40, 41, 42);
 
-    public PreGameMenu() {
+    private final GameInstance arena;
+
+    public PreGameMenu(GameInstance arena) {
         super(54, player -> Message.MENU_PREGAME_TITLE.getString(player));
+        this.arena = arena;
+        RoomSettings settings = arena.getSettings();
 
         setButton(11, MenuButton.of(
                 player -> item(Material.RED_WOOL, Message.MENU_JOIN_RED.getString(player)),
-                (player, click) -> Team.joinTeam(player, redTeam, true)
+                (player, click) -> arena.joinTeam(player, TeamColor.RED)
         ));
         setButton(12, MenuButton.of(
                 player -> item(Material.BLUE_WOOL, Message.MENU_JOIN_BLUE.getString(player)),
-                (player, click) -> Team.joinTeam(player, Team.blueTeam, true)
+                (player, click) -> arena.joinTeam(player, TeamColor.BLUE)
         ));
         setButton(20, toggleButton(
-                Setting::isEnableMediumBlock,
-                Setting::toggleMediumBlock,
+                settings::isEnableMediumBlock,
+                settings::toggleMediumBlock,
                 Message.MENU_MEDIUM_BLOCKS
         ));
         setButton(21, toggleButton(
-                Setting::isEnableHardBlock,
-                Setting::toggleHardBlock,
+                settings::isEnableHardBlock,
+                settings::toggleHardBlock,
                 Message.MENU_HARD_BLOCKS
         ));
         setButton(22, toggleButton(
-                Setting::isEnableDyedBlock,
-                Setting::toggleDyedBlock,
+                settings::isEnableDyedBlock,
+                settings::toggleDyedBlock,
                 Message.MENU_DYED_BLOCKS
         ));
         setButton(23, toggleButton(
-                Setting::isEnableEndBlock,
-                Setting::toggleEndBlock,
+                settings::isEnableEndBlock,
+                settings::toggleEndBlock,
                 Message.MENU_END_BLOCKS
         ));
         setButton(24, MenuButton.of(
                 player -> ItemBuilder.of(Material.NAME_TAG)
-                        .name(Message.MENU_BLOCK_AMOUNT.getString(player) + Setting.getBlockAmount())
+                        .name(Message.MENU_BLOCK_AMOUNT.getString(player) + settings.getBlockAmount())
                         .lore(Message.MENU_BLOCK_AMOUNT_LORE.getStringList(player))
                         .build(),
                 (player, click) -> {
                     player.closeInventory();
-                    top.lqsnow.blockracing.core.GameManager.get().sessions().getEditAmountPlayers().add(player.getName());
+                    GameManager.get().sessions().getEditAmountPlayers().add(player.getName());
                     player.sendMessage(Message.NOTICE_SET_BLOCKS.getString(player));
                 }
         ));
         setButton(29, MenuButton.of(this::normalModeItem, (player, click) -> {
-            Setting.setCurrentGameMode(Setting.GameMode.NORMAL);
+            settings.setGameMode(Setting.GameMode.NORMAL);
             refreshSettings();
         }));
         setButton(30, MenuButton.of(this::racingModeItem, (player, click) -> {
-            Setting.setCurrentGameMode(Setting.GameMode.RACING);
+            settings.setGameMode(Setting.GameMode.RACING);
             refreshSettings();
         }));
         setButton(33, MenuButton.of(
-                player -> ItemBuilder.of(Setting.isSpeedMode() ? Material.GREEN_CONCRETE : Material.YELLOW_CONCRETE)
-                        .name(Setting.isSpeedMode()
+                player -> ItemBuilder.of(settings.isSpeedMode() ? Material.GREEN_CONCRETE : Material.YELLOW_CONCRETE)
+                        .name(settings.isSpeedMode()
                                 ? Message.MENU_SPEED_MODE_ENABLED.getString(player)
                                 : Message.MENU_SPEED_MODE_DISABLED.getString(player))
                         .lore(Message.MENU_SPEED_MODE_LORE.getStringList(player))
                         .build(),
                 (player, click) -> {
-                    Setting.toggleSpeedMode();
+                    settings.toggleSpeedMode();
                     refreshSettings();
                 }
         ));
@@ -93,14 +98,14 @@ public final class PreGameMenu extends MenuView {
                         .name(Message.MENU_READY.getString(player))
                         .lore(Message.MENU_READY_LORE.getStringList(player))
                         .build(),
-                (player, click) -> Game.playerReady(player)
+                (player, click) -> arena.playerReady(player)
         ));
         setButton(39, MenuButton.of(
                 player -> ItemBuilder.of(Material.DIAMOND)
                         .name(Message.MENU_START.getString(player))
                         .lore(Message.MENU_START_LORE.getStringList(player))
                         .build(),
-                (player, click) -> Game.checkStartDemands(player)
+                (player, click) -> arena.checkStartDemands(player)
         ));
         setButton(41, MenuButton.of(
                 player -> ItemBuilder.of(Material.PLAYER_HEAD)
@@ -114,6 +119,12 @@ public final class PreGameMenu extends MenuView {
                         .name("§bLanguage / 语言")
                         .build(),
                 (player, click) -> new LanguageMenu().open(player)
+        ));
+        setButton(45, MenuButton.of(
+                player -> ItemBuilder.of(Material.ARROW)
+                        .name(Message.MENU_ALL_RETURN_BACK.getString(player))
+                        .build(),
+                (player, click) -> new top.lqsnow.blockracing.lobby.GameSelectorMenu().open(player)
         ));
     }
 
@@ -140,7 +151,7 @@ public final class PreGameMenu extends MenuView {
         return null;
     }
 
-    private MenuButton toggleButton(BooleanSupplier enabled, Runnable toggle, Message label) {
+    private MenuButton toggleButton(java.util.function.BooleanSupplier enabled, Runnable toggle, Message label) {
         return MenuButton.of(
                 player -> item(
                         enabled.getAsBoolean() ? Material.GREEN_CONCRETE : Material.RED_CONCRETE,
@@ -150,14 +161,14 @@ public final class PreGameMenu extends MenuView {
                 ),
                 (player, click) -> {
                     toggle.run();
-                    Block.refreshAvailableBlocksAndClampAmount();
+                    arena.refreshAvailableBlocksAndClampAmount();
                     refreshSettings();
                 }
         );
     }
 
     private ItemStack normalModeItem(Player player) {
-        boolean selected = Setting.getCurrentGameMode() == Setting.GameMode.NORMAL;
+        boolean selected = arena.getSettings().getGameMode() == Setting.GameMode.NORMAL;
         return ItemBuilder.of(selected ? Material.GREEN_CONCRETE : Material.YELLOW_CONCRETE)
                 .name((selected ? Message.MENU_CURRENT_MODE : Message.MENU_SWITCH_TO).getString(player)
                         + Message.MENU_NORMAL_MODE.getString(player))
@@ -166,7 +177,7 @@ public final class PreGameMenu extends MenuView {
     }
 
     private ItemStack racingModeItem(Player player) {
-        boolean selected = Setting.getCurrentGameMode() == Setting.GameMode.RACING;
+        boolean selected = arena.getSettings().getGameMode() == Setting.GameMode.RACING;
         return ItemBuilder.of(selected ? Material.GREEN_CONCRETE : Material.YELLOW_CONCRETE)
                 .name((selected ? Message.MENU_CURRENT_MODE : Message.MENU_SWITCH_TO).getString(player)
                         + Message.MENU_RACING_MODE.getString(player))
@@ -181,10 +192,5 @@ public final class PreGameMenu extends MenuView {
 
     private static ItemStack item(Material material, String name) {
         return ItemBuilder.of(material).name(name).build();
-    }
-
-    @FunctionalInterface
-    private interface BooleanSupplier {
-        boolean getAsBoolean();
     }
 }

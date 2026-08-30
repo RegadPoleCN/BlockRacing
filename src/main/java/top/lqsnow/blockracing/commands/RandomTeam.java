@@ -85,14 +85,19 @@ public class RandomTeam implements CommandExecutor {
             return;
         }
 
+        top.lqsnow.blockracing.core.GameInstance arena = top.lqsnow.blockracing.core.GameManager.get()
+                .sessions().arenaOf(player).orElse(top.lqsnow.blockracing.core.GameManager.first());
         List<List<Player>> teams = splitPlayers(Bukkit.getOnlinePlayers(), new Random());
-        Team.clearTeams();
-        teams.get(0).forEach(member -> Team.joinTeam(member, Team.redTeam, false));
-        teams.get(1).forEach(member -> Team.joinTeam(member, Team.blueTeam, false));
+        arena.getTeams().clear();
+        teams.get(0).forEach(member -> arena.getTeams().add(member.getName(),
+                top.lqsnow.blockracing.core.TeamColor.RED));
+        teams.get(1).forEach(member -> arena.getTeams().add(member.getName(),
+                top.lqsnow.blockracing.core.TeamColor.BLUE));
+        Scoreboard.syncPlayerTeams();
 
         CommandUtil.sendAll(Message.NOTICE_TEAM_SHUFFLE_TRIGGERED,
                 (viewer, text) -> text.replace("%player%", player.getName()));
-        Gui.updateMenu(new PreGameMenu());
+        Gui.updateMenu(new PreGameMenu(arena));
         Scoreboard.updateScoreboard();
     }
 
