@@ -109,7 +109,7 @@ public class Main extends JavaPlugin {
                     .filter(arena -> arena.getState() == RoomState.RUNNING)
                     .forEach(InstanceProgressStore::saveNow);
         } else {
-            InstanceProgressStore.clear();
+            InstanceProgressStore.clearAll();
         }
         Config.saveConfig();
     }

@@ -29,22 +29,22 @@ import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.managers.Config;
 
 /** Crash-recovery snapshot of one game instance (was managers.GameProgressStore).
- * The single save file lives in the plugin data folder; recovery only applies
- * when the arena world folder still exists. */
+ * Each arena stores its own file at arenas/<id>/progress.yml; recovery only
+ * applies when the arena world folder still exists. */
 public final class InstanceProgressStore {
     private static final int FORMAT_VERSION = 2;
-    private static final String FILE_NAME = "game-progress.yml";
-    private static File file;
+    private static final String LEGACY_FILE_NAME = "game-progress.yml";
     private static boolean recoveredGame;
 
     private InstanceProgressStore() {
     }
 
-    private static File file() {
-        if (file == null) {
-            file = new File(Main.getInstance().getDataFolder(), FILE_NAME);
-        }
-        return file;
+    private static File fileFor(GameInstance arena) {
+        return new File(Main.getInstance().getDataFolder(), "arenas/" + arena.getId() + "/progress.yml");
+    }
+
+    private static File legacyFile() {
+        return new File(Main.getInstance().getDataFolder(), LEGACY_FILE_NAME);
     }
 
     public static void startAutosave() {
@@ -59,20 +59,22 @@ public final class InstanceProgressStore {
 
     public static boolean load(GameInstance target) {
         if (!Config.RECOVERY_ENABLED.getBoolean()) {
-            clear();
+            clearAll();
             return false;
         }
-        if (!file().isFile()) {
+        migrateLegacyFile(target);
+        File file = fileFor(target);
+        if (!file.isFile()) {
             return false;
         }
-        YamlConfiguration state = YamlConfiguration.loadConfiguration(file());
+        YamlConfiguration state = YamlConfiguration.loadConfiguration(file);
         String savedState = state.getString("state");
         if (!"INGAME".equals(savedState) && !RoomState.RUNNING.name().equals(savedState)) {
-            clear();
+            clear(target);
             return false;
         }
         if (!restoreWorld(state, target)) {
-            clear();
+            clear(target);
             return false;
         }
         try {
@@ -150,16 +152,47 @@ public final class InstanceProgressStore {
         return true;
     }
 
+    /** Moves a pre-refactor single save file into its per-arena location. */
+    private static void migrateLegacyFile(GameInstance target) {
+        File legacy = legacyFile();
+        if (!legacy.isFile()) {
+            return;
+        }
+        File targetFile = fileFor(target);
+        if (targetFile.isFile()) {
+            return;
+        }
+        try {
+            int legacyArenaId = YamlConfiguration.loadConfiguration(legacy).getInt("arena-id", 1);
+            if (legacyArenaId != target.getId()) {
+                Main.getInstance().getLogger().info(
+                        "Legacy game progress belongs to arena " + legacyArenaId
+                                + "; leaving it in place.");
+                return;
+            }
+            Files.createDirectories(targetFile.toPath().getParent());
+            Files.move(legacy.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Files.deleteIfExists(new File(legacy.getParentFile(), legacy.getName() + ".tmp").toPath());
+            Main.getInstance().getLogger().info("Migrated legacy game progress to "
+                    + targetFile.getPath());
+        } catch (IOException ex) {
+            Main.getInstance().getLogger().log(Level.WARNING,
+                    "Could not migrate legacy game progress.", ex);
+        }
+    }
+
     public static synchronized void saveNow(GameInstance arena) {
         YamlConfiguration state = snapshot(arena);
-        File temporary = new File(file().getParentFile(), file().getName() + ".tmp");
+        File file = fileFor(arena);
+        File temporary = new File(file.getParentFile(), file.getName() + ".tmp");
         try {
+            Files.createDirectories(file.getParentFile().toPath());
             Files.writeString(temporary.toPath(), state.saveToString(), StandardCharsets.UTF_8);
             try {
-                Files.move(temporary.toPath(), file().toPath(),
+                Files.move(temporary.toPath(), file.toPath(),
                         StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException atomicMoveFailure) {
-                Files.move(temporary.toPath(), file().toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException ex) {
             Main.getInstance().getLogger().log(Level.SEVERE, "Unable to save game progress.", ex);
@@ -170,13 +203,40 @@ public final class InstanceProgressStore {
         return recoveredGame;
     }
 
-    public static void clear() {
-        recoveredGame = false;
+    public static void clear(GameInstance arena) {
+        File file = fileFor(arena);
         try {
-            Files.deleteIfExists(file().toPath());
-            Files.deleteIfExists(new File(file().getParentFile(), file().getName() + ".tmp").toPath());
+            Files.deleteIfExists(file.toPath());
+            Files.deleteIfExists(new File(file.getParentFile(), file.getName() + ".tmp").toPath());
         } catch (IOException ex) {
             Main.getInstance().getLogger().log(Level.WARNING, "Unable to remove old game progress.", ex);
+        }
+    }
+
+    /** Removes every per-arena progress file plus any legacy leftovers. */
+    public static void clearAll() {
+        recoveredGame = false;
+        File arenasDir = new File(Main.getInstance().getDataFolder(), "arenas");
+        if (arenasDir.isDirectory()) {
+            try (var walk = Files.walk(arenasDir.toPath())) {
+                walk.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException ex) {
+                        Main.getInstance().getLogger().log(Level.WARNING,
+                                "Could not delete " + path, ex);
+                    }
+                });
+            } catch (IOException ex) {
+                Main.getInstance().getLogger().log(Level.WARNING,
+                        "Could not clean up arena progress files.", ex);
+            }
+        }
+        try {
+            Files.deleteIfExists(legacyFile().toPath());
+            Files.deleteIfExists(new File(legacyFile().getParentFile(), legacyFile().getName() + ".tmp").toPath());
+        } catch (IOException ex) {
+            Main.getInstance().getLogger().log(Level.WARNING, "Unable to remove legacy game progress.", ex);
         }
     }
 

@@ -880,7 +880,7 @@ public class GameInstance {
         broadcast.all(winNotice);
         broadcast.sound(Sound.UI_TOAST_CHALLENGE_COMPLETE);
         state = RoomState.ENDING;
-        InstanceProgressStore.clear();
+        InstanceProgressStore.clear(this);
         GameManager.get().scheduleDispose(this);
     }
 
@@ -895,7 +895,7 @@ public class GameInstance {
             player.setGameMode(GameMode.SPECTATOR);
         }
         state = RoomState.ENDING;
-        InstanceProgressStore.clear();
+        InstanceProgressStore.clear(this);
         GameManager.get().scheduleDispose(this);
     }
 
