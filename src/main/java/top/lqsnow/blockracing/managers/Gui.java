@@ -2,7 +2,6 @@ package top.lqsnow.blockracing.managers;
 
 import java.util.Optional;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import top.lqsnow.blockracing.core.GameInstance;
@@ -43,10 +42,6 @@ public class Gui {
         player.getOpenInventory().setTitle(color == TeamColor.RED
                 ? Message.MENU_RED_CHEST.getString(player) + (index + 1)
                 : Message.MENU_BLUE_CHEST.getString(player) + (index + 1));
-    }
-
-    public static void closeAllPlayersMenu() {
-        Bukkit.getOnlinePlayers().forEach(Player::closeInventory);
     }
 
     // Update menu

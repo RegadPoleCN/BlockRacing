@@ -86,6 +86,7 @@ public class GameInstance {
     private final List<String> inGamePlayers = new ArrayList<>();
     private final List<String> freeRandomTp = new ArrayList<>();
     private final List<String> locatePermission = new ArrayList<>();
+    private final Map<String, org.bukkit.permissions.PermissionAttachment> locateAttachments = new HashMap<>();
     private int locateCost;
     private final Map<String, Integer> collectAmount = new HashMap<>();
 
@@ -168,7 +169,8 @@ public class GameInstance {
         // The permissions will disappear when the player exits and re-enters,
         // permissions need to be given again.
         if (locatePermission.contains(player.getName())) {
-            player.addAttachment(Main.getInstance(), "minecraft.command.locate", true);
+            locateAttachments.put(player.getName(),
+                    player.addAttachment(Main.getInstance(), "minecraft.command.locate", true));
         }
 
         checkUpdate(player);
@@ -462,7 +464,8 @@ public class GameInstance {
             Scoreboard.updateScoreboard();
             locatePermission.add(player.getName());
             broadcast.all(Message.NOTICE_BUY_LOCATE, (viewer, text) -> text.replace("%player%", player.getName()));
-            player.addAttachment(Main.getInstance(), "minecraft.command.locate", true);
+            locateAttachments.put(player.getName(),
+                    player.addAttachment(Main.getInstance(), "minecraft.command.locate", true));
             InstanceProgressStore.saveNow(this);
         } else {
             player.sendMessage(Message.NOTICE_NOT_ENOUGH_SCORE.getString(player));
@@ -873,9 +876,18 @@ public class GameInstance {
             Player player = Bukkit.getPlayerExact(name);
             sessions.leaveArena(name);
             if (player != null) {
+                // Recycle the locate permission granted for this game.
+                org.bukkit.permissions.PermissionAttachment attachment = locateAttachments.remove(name);
+                if (attachment != null) {
+                    player.removeAttachment(attachment);
+                }
                 online.add(player);
+            } else {
+                // Offline: drop the pending lobby restore so it does not linger.
+                sessions.dropSavedSession(name);
             }
         }
+        locateAttachments.clear();
         GameManager.get().remove(this);
         GameInstance fresh = GameManager.get().createGame();
         for (Player player : online) {

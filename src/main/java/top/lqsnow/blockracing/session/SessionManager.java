@@ -30,6 +30,14 @@ public final class SessionManager {
         return savedSessions.remove(playerId);
     }
 
+    /** Drops a stale saved session for a player who is offline at dispose time. */
+    public void dropSavedSession(String playerName) {
+        Player player = org.bukkit.Bukkit.getPlayerExact(playerName);
+        savedSessions.remove(player != null
+                ? player.getUniqueId()
+                : org.bukkit.Bukkit.getOfflinePlayer(playerName).getUniqueId());
+    }
+
     public boolean hasSavedSession(UUID playerId) {
         return savedSessions.containsKey(playerId);
     }
