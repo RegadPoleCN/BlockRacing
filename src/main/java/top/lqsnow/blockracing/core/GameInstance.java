@@ -99,6 +99,7 @@ public class GameInstance {
 
     private BukkitTask waitingTask;
     private BukkitTask tickTask;
+    private BukkitTask countdownTask;
     private World world;
     private long startedAt;
 
@@ -204,6 +205,7 @@ public class GameInstance {
         redRollPlayers.remove(player.getName());
         readyPlayers.remove(player.getName());
         sessions.getEditAmountPlayers().remove(player.getName());
+        cancelCountdown();
     }
 
     private void checkUpdate(Player player) {
@@ -242,6 +244,7 @@ public class GameInstance {
         } else {
             readyPlayers.remove(player.getName());
             broadcast.all(Message.NOTICE_CANCEL_READY, (viewer, text) -> text.replace("%player%", player.getName()));
+            cancelCountdown();
             return;
         }
         maybeAutoStart();
@@ -252,16 +255,54 @@ public class GameInstance {
         if (!Config.AUTO_START.getBoolean() || state != RoomState.WAITING) {
             return;
         }
+        if (!startConditionsMet()) {
+            return;
+        }
+        int seconds = Math.max(0, Config.COUNTDOWN_SECONDS.getInt());
+        if (seconds <= 0) {
+            beginStart();
+            return;
+        }
+        if (countdownTask != null) {
+            return; // already counting down
+        }
+        broadcast.all(Message.NOTICE_ARENA_COUNTDOWN,
+                (viewer, text) -> text.replace("%seconds%", String.valueOf(seconds)));
+        countdownTask = Bukkit.getScheduler().runTaskLater(Main.getInstance(), () -> {
+            countdownTask = null;
+            if (state == RoomState.WAITING && startConditionsMet()) {
+                beginStart();
+            } else {
+                broadcast.all(Message.NOTICE_ARENA_COUNTDOWN_CANCEL);
+            }
+        }, seconds * 20L);
+    }
+
+    /** Cancels a pending start countdown, if one is running. */
+    private void cancelCountdown() {
+        if (countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
+            broadcast.all(Message.NOTICE_ARENA_COUNTDOWN_CANCEL);
+        }
+    }
+
+    /** min-players, everyone ready, both teams filled and valid blocks. */
+    private boolean startConditionsMet() {
         int online = arenaPlayers().size();
         if (online < Math.max(1, Config.MIN_PLAYERS.getInt())) {
-            return;
+            return false;
         }
         if (readyPlayers.isEmpty() || readyPlayers.size() != online) {
-            return;
+            return false;
         }
         if (teams.hasEmptyTeam() || !validateBlocks()) {
-            return;
+            return false;
         }
+        return true;
+    }
+
+    private void beginStart() {
         broadcast.all(Message.NOTICE_START);
         start();
     }
@@ -870,6 +911,10 @@ public class GameInstance {
         }
         if (tickTask != null) {
             tickTask.cancel();
+        }
+        if (countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
         }
         List<Player> online = new ArrayList<>();
         for (String name : sessions.boundPlayers(this)) {

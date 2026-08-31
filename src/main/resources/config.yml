@@ -50,6 +50,8 @@ recovery:
 # auto-start - start automatically once everyone is ready and min-players met.
 # idle-rooms - number of empty waiting rooms kept available.
 # max-game-minutes - watchdog limit before a running game is force-ended.
+# countdown-seconds - auto-start countdown once everyone is ready; 0 disables
+#                     the countdown and starts immediately.
 arena:
   world-prefix: "arena_"
   backup-keep: 8
@@ -58,6 +60,7 @@ arena:
   auto-start: true
   idle-rooms: 1
   max-game-minutes: 240
+  countdown-seconds: 10
 
 # Lobby world players wait in between games (created if missing).
 lobby:

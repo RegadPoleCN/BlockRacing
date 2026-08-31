@@ -50,6 +50,7 @@ recovery:
 # auto-start - 所有人准备且达到最少人数后自动开局
 # idle-rooms - 保持可用的空等待房间数量
 # max-game-minutes - 看门狗强制结束一局的最长时间（分钟）
+# countdown-seconds - 全员准备后的开局倒计时秒数；0 = 关闭倒计时立即开局
 arena:
   world-prefix: "arena_"
   backup-keep: 8
@@ -58,6 +59,7 @@ arena:
   auto-start: true
   idle-rooms: 1
   max-game-minutes: 240
+  countdown-seconds: 10
 
 # 玩家在对局之间等待所在的大厅世界（不存在时自动创建）
 lobby:

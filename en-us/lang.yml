@@ -196,6 +196,8 @@ rule-book:
 
 # Notices
 notice:
+  arena-countdown: "&8[&bGame&8] &b%seconds% &7seconds until the game starts!"
+  arena-countdown-cancel: "&8[&bGame&8] &7The start countdown was cancelled."
   arena-full: "&cThat game is full!"
   already-in-game: "&cYou are already in a game! Leave it first."
   not-in-game: "&cYou are not in a game!"

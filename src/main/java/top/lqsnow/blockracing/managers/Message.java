@@ -143,6 +143,8 @@ public enum Message {
     NOTICE_CANCEL_READY("notice.cancel-ready"),
     NOTICE_ALL_READY("notice.all-ready"),
     NOTICE_START("notice.start"),
+    NOTICE_ARENA_COUNTDOWN("notice.arena-countdown"),
+    NOTICE_ARENA_COUNTDOWN_CANCEL("notice.arena-countdown-cancel"),
     NOTICE_ARENA_FULL("notice.arena-full"),
     NOTICE_ALREADY_IN_GAME("notice.already-in-game"),
     NOTICE_NOT_IN_GAME("notice.not-in-game"),

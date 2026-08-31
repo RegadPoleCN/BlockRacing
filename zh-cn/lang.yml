@@ -187,6 +187,8 @@ rule-book:
 
 # Notices
 notice:
+  arena-countdown: "&8[&b游戏&8] &b%seconds% &7秒后开局！"
+  arena-countdown-cancel: "&8[&b游戏&8] &7开局倒计时已取消。"
   arena-full: "&c该游戏已满员！"
   already-in-game: "&c你已经在一个游戏中！请先离开当前游戏。"
   not-in-game: "&c你当前不在任何游戏中！"

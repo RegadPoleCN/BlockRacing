@@ -31,6 +31,7 @@ public enum Config {
     AUTO_START("arena.auto-start"),
     IDLE_ROOMS("arena.idle-rooms"),
     MAX_GAME_MINUTES("arena.max-game-minutes"),
+    COUNTDOWN_SECONDS("arena.countdown-seconds"),
     LOBBY_WORLD("lobby.world");
 
     private static File file;
