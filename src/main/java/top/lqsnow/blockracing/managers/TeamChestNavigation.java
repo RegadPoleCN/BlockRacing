@@ -11,6 +11,8 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import top.lqsnow.blockracing.Main;
+import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.menu.ReservedInventorySlot;
 
@@ -24,7 +26,8 @@ public final class TeamChestNavigation implements Listener {
     private static final Map<Inventory, ReservedInventorySlot<ItemStack>> slots = new IdentityHashMap<>();
 
     private static boolean teamChest(Inventory inventory) {
-        return Game.redTeamChest.contains(inventory) || Game.blueTeamChest.contains(inventory);
+        return GameManager.get().all().stream().anyMatch(arena -> arena.chests(TeamColor.RED).contains(inventory)
+                || arena.chests(TeamColor.BLUE).contains(inventory));
     }
 
     private static boolean navigation(ItemStack item) {

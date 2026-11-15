@@ -27,14 +27,25 @@ import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.core.RoomState;
 import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.managers.Config;
+import top.lqsnow.blockracing.managers.TeamChestNavigation;
 
 /** Crash-recovery snapshot of one game instance (was managers.GameProgressStore).
  * Each arena stores its own file at arenas/<id>/progress.yml; recovery only
  * applies when the arena world folder still exists. */
 public final class InstanceProgressStore {
-    private static final int FORMAT_VERSION = 2;
+    private static final int FORMAT_VERSION = 3;
     private static final String LEGACY_FILE_NAME = "game-progress.yml";
     private static boolean recoveredGame;
+    private static final java.util.Set<Integer> recoveryFailures = new java.util.HashSet<>();
+
+    /** A failed restore must never be overwritten by later autosaves. */
+    public static boolean hasRecoveryFailure(GameInstance arena) {
+        return recoveryFailures.contains(arena.getId());
+    }
+
+    private static void markRecoveryFailure(GameInstance arena) {
+        recoveryFailures.add(arena.getId());
+    }
 
     private InstanceProgressStore() {
     }
@@ -68,9 +79,22 @@ public final class InstanceProgressStore {
             return false;
         }
         YamlConfiguration state = YamlConfiguration.loadConfiguration(file);
+        if (!state.contains("state")) {
+            // Most likely a corrupt/unreadable file: never delete it, never save over it.
+            markRecoveryFailure(target);
+            Main.getInstance().getLogger().severe(
+                    "Cannot read game progress of arena " + target.getId() + "; original save preserved.");
+            return false;
+        }
         String savedState = state.getString("state");
         if (!"INGAME".equals(savedState) && !RoomState.RUNNING.name().equals(savedState)) {
-            clear(target);
+            if ("PREGAME".equals(savedState) || "WAITING".equals(savedState) || "ENDING".equals(savedState)) {
+                clear(target);
+            } else {
+                markRecoveryFailure(target);
+                Main.getInstance().getLogger().severe(
+                        "Unknown game state in progress.yml of arena " + target.getId() + "; original save preserved.");
+            }
             return false;
         }
         if (!restoreWorld(state, target)) {
@@ -78,6 +102,10 @@ public final class InstanceProgressStore {
             return false;
         }
         try {
+            int format = state.getInt("format-version", 1);
+            if (format < 1 || format > FORMAT_VERSION) {
+                throw new IllegalArgumentException("Unsupported progress format " + format);
+            }
             target.setState(RoomState.RUNNING);
             TeamColor[] colors = TeamColor.values();
             target.setScore(colors[0], state.getInt("scores.red"));
@@ -97,12 +125,10 @@ public final class InstanceProgressStore {
             } catch (IllegalArgumentException ignored) {
                 // Keep the configured mode if an older/corrupt state contains an unknown value.
             }
-
-            BlockState blockState = target.getBlockState();
-            replace(blockState.all(TeamColor.RED), state.getStringList("blocks.red-all"));
-            replace(blockState.all(TeamColor.BLUE), state.getStringList("blocks.blue-all"));
-            replace(blockState.remaining(TeamColor.RED), state.getStringList("blocks.red-remaining"));
-            replace(blockState.remaining(TeamColor.BLUE), state.getStringList("blocks.blue-remaining"));
+            target.restoreTasks(state);
+            if (target.session() != null) {
+                settings.setGameMode(target.session().racing() ? GameModeType.RACING : GameModeType.NORMAL);
+            }
 
             target.getTeams().restore(state.getStringList("teams.red"), state.getStringList("teams.blue"));
             replace(target.getInGamePlayers(), state.getStringList("players.in-game"));
@@ -119,8 +145,10 @@ public final class InstanceProgressStore {
             Main.getInstance().getLogger().info("Recovered unfinished BlockRacing game progress.");
             return true;
         } catch (RuntimeException ex) {
+            markRecoveryFailure(target);
             Main.getInstance().getLogger().log(Level.SEVERE,
-                    "Unable to restore game-progress.yml; starting in waiting state instead.", ex);
+                    "Unable to restore game progress of arena " + target.getId()
+                            + "; starting in waiting state instead. Original save preserved.", ex);
             target.setState(RoomState.WAITING);
             return false;
         }
@@ -182,6 +210,9 @@ public final class InstanceProgressStore {
     }
 
     public static synchronized void saveNow(GameInstance arena) {
+        if (hasRecoveryFailure(arena)) {
+            return;
+        }
         YamlConfiguration state = snapshot(arena);
         File file = fileFor(arena);
         File temporary = new File(file.getParentFile(), file.getName() + ".tmp");
@@ -204,6 +235,7 @@ public final class InstanceProgressStore {
     }
 
     public static void clear(GameInstance arena) {
+        recoveryFailures.remove(arena.getId());
         File file = fileFor(arena);
         try {
             Files.deleteIfExists(file.toPath());
@@ -216,6 +248,7 @@ public final class InstanceProgressStore {
     /** Removes every per-arena progress file plus any legacy leftovers. */
     public static void clearAll() {
         recoveredGame = false;
+        recoveryFailures.clear();
         File arenasDir = new File(Main.getInstance().getDataFolder(), "arenas");
         if (arenasDir.isDirectory()) {
             try (var walk = Files.walk(arenasDir.toPath())) {
@@ -256,6 +289,7 @@ public final class InstanceProgressStore {
         state.set("locate-cost", arena.getLocateCost());
         state.set("settings.speed-mode", arena.getSettings().isSpeedMode());
         state.set("settings.game-mode", arena.getSettings().getGameMode().name());
+        arena.saveTasks(state);
         state.set("blocks.red-all", new ArrayList<>(arena.getBlockState().all(TeamColor.RED)));
         state.set("blocks.blue-all", new ArrayList<>(arena.getBlockState().all(TeamColor.BLUE)));
         state.set("blocks.red-remaining", new ArrayList<>(arena.getBlockState().remaining(TeamColor.RED)));
@@ -275,7 +309,7 @@ public final class InstanceProgressStore {
 
     private static void saveChests(YamlConfiguration state, String path, List<Inventory> chests) {
         for (int index = 0; index < chests.size(); index++) {
-            state.set(path + "." + index, Arrays.asList(chests.get(index).getContents()));
+            state.set(path + "." + index, Arrays.asList(TeamChestNavigation.savedContents(chests.get(index))));
         }
     }
 
@@ -288,7 +322,7 @@ public final class InstanceProgressStore {
                     contents[slot] = item;
                 }
             }
-            chests.get(index).setContents(contents);
+            TeamChestNavigation.restore(chests.get(index), contents);
         }
     }
 

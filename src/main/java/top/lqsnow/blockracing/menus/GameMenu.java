@@ -372,7 +372,6 @@ public final class GameMenu extends MenuView {
         int remaining = team == null ? 0 : arena.rollsRemaining(team);
         return Message.MENU_ROLL_REMAINING.getString(player).replace("%remaining%", String.valueOf(remaining));
     }
-    }
 
     private static List<String> replaceWaypointPlaceholders(List<String> lore, String dimension,
                                                              String coords, String biome) {

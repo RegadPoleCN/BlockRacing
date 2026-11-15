@@ -1,11 +1,14 @@
 package top.lqsnow.blockracing.game;
 
 import top.lqsnow.blockracing.managers.Config;
+import top.lqsnow.blockracing.pools.DifficultyPreset;
 
 /** Settings of one game room. Values are seeded from config.yml when the room
  * is created and are written back to config.yml on change, mirroring the
  * previous global behaviour. */
 public final class RoomSettings {
+    private DifficultyPreset.Kind difficulty = DifficultyPreset.Kind.NORMAL;
+    private boolean copperExtras;
     private boolean enableMediumBlock;
     private boolean enableHardBlock;
     private boolean enableDyedBlock;
@@ -32,6 +35,12 @@ public final class RoomSettings {
     }
 
     public void loadFromConfig() {
+        try {
+            difficulty = DifficultyPreset.Kind.parse(Config.DIFFICULTY.getString());
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            difficulty = DifficultyPreset.Kind.NORMAL;
+        }
+        copperExtras = Config.COPPER_EXTRAS.getBoolean();
         enableMediumBlock = Config.MEDIUM_BLOCK.getBoolean();
         enableHardBlock = Config.HARD_BLOCK.getBoolean();
         enableDyedBlock = Config.DYED_BLOCK.getBoolean();
@@ -86,6 +95,27 @@ public final class RoomSettings {
 
     public GameModeType getGameMode() {
         return gameMode;
+    }
+
+    public DifficultyPreset.Kind getDifficulty() {
+        return difficulty;
+    }
+
+    public boolean isCopperExtras() {
+        return copperExtras;
+    }
+
+    public void setDifficulty(DifficultyPreset.Kind value) {
+        java.util.Objects.requireNonNull(value);
+        difficulty = value;
+        Config.DIFFICULTY.setString(value.id());
+        Config.saveConfig();
+    }
+
+    public void setCopperExtras(boolean value) {
+        copperExtras = value;
+        Config.COPPER_EXTRAS.setBoolean(value);
+        Config.saveConfig();
     }
 
     public void setEnableMediumBlock(boolean value) {

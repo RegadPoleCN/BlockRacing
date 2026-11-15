@@ -3,7 +3,12 @@ package top.lqsnow.blockracing.menus;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import top.lqsnow.blockracing.managers.*;
+import top.lqsnow.blockracing.core.GameInstance;
+import top.lqsnow.blockracing.core.RoomState;
+import top.lqsnow.blockracing.managers.Block;
+import top.lqsnow.blockracing.managers.Gui;
+import top.lqsnow.blockracing.managers.Message;
+import top.lqsnow.blockracing.managers.Scoreboard;
 import top.lqsnow.blockracing.pools.DifficultyPreset;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.menu.MenuButton;
@@ -12,30 +17,33 @@ import top.lqsnow.blockracing.utils.TranslationUtil;
 import java.util.List;
 import java.util.ArrayList;
 
+/** Per-arena difficulty picker; presets themselves are shared library data. */
 public final class DifficultyMenu extends MenuView {
-    public DifficultyMenu() {
+    private final GameInstance arena;
+
+    public DifficultyMenu(GameInstance arena) {
         super(27, player -> Message.BLOCK_LIBRARY_TITLE.getString(player));
+        this.arena = arena;
         for (DifficultyPreset.Kind kind : DifficultyPreset.Kind.standards()) {
             setButton(10 + kind.ordinal(), MenuButton.of(player -> presetItem(kind, player), (player, click) -> {
-                if (!pregame(player)) return;
-                Setting.setDifficulty(kind);
-                Block.addUpBlocks();
-                refreshMenus();
+                if (!pregame(arena, player)) return;
+                arena.getSettings().setDifficulty(kind);
+                refreshMenus(arena);
             }));
         }
         setButton(15, MenuButton.of(this::customItem, (player, click) -> {
-            if (!pregame(player)) return;
-            CustomBlockMenu.edit(player, () -> Block.activateCustom(Block.customSettings().source()));
+            if (!pregame(arena, player)) return;
+            CustomBlockMenu.edit(player, arena, () -> Block.activateCustom(arena, Block.customSettings().source()));
         }));
         setButton(16, MenuButton.of(player -> ItemBuilder.of(Material.COMPARATOR)
                 .name(Message.CUSTOM_TITLE.getString(player))
                 .lore(Message.CUSTOM_ENTRY_LORE.getStringList(player)).build(), (player, click) -> {
-            if (pregame(player)) new CustomBlockMenu().open(player);
+            if (pregame(arena, player)) new CustomBlockMenu(arena).open(player);
         }));
-        setButton(22, copperButton());
+        setButton(22, copperButton(arena));
         setButton(18, MenuButton.of(player -> ItemBuilder.of(Material.ARROW)
                 .name(Message.BLOCK_LIBRARY_BACK.getString(player)).build(), (player, click) -> {
-            if (pregame(player)) new PreGameMenu().open(player);
+            if (pregame(arena, player)) new PreGameMenu(arena).open(player);
         }));
     }
 
@@ -44,7 +52,7 @@ public final class DifficultyMenu extends MenuView {
     }
 
     private ItemStack customItem(Player player) {
-        boolean selected = Setting.getDifficulty() == DifficultyPreset.Kind.CUSTOM;
+        boolean selected = arena.getSettings().getDifficulty() == DifficultyPreset.Kind.CUSTOM;
         String source = (Block.customSettings().source() == top.lqsnow.blockracing.pools.CustomSettings.Source.LOCAL
                 ? Message.CUSTOM_SOURCE_LOCAL : Message.CUSTOM_SOURCE_TIERS).getString(player);
         return ItemBuilder.of(selected ? Material.GREEN_CONCRETE : Material.YELLOW_CONCRETE)
@@ -54,35 +62,34 @@ public final class DifficultyMenu extends MenuView {
                         .map(line -> line.replace("%source%", source)).toList()).build();
     }
 
-    public static MenuButton copperButton() {
-        return MenuButton.of(player -> ItemBuilder.of(Setting.isCopperExtras() ? Material.GREEN_CONCRETE : Material.RED_CONCRETE)
-                .name(Message.BLOCK_LIBRARY_COPPER.getString(player) + (Setting.isCopperExtras()
+    public static MenuButton copperButton(GameInstance arena) {
+        return MenuButton.of(player -> ItemBuilder.of(arena.getSettings().isCopperExtras() ? Material.GREEN_CONCRETE : Material.RED_CONCRETE)
+                .name(Message.BLOCK_LIBRARY_COPPER.getString(player) + (arena.getSettings().isCopperExtras()
                         ? Message.MENU_ENABLED.getString(player) : Message.MENU_DISABLED.getString(player)))
                 .lore(Message.BLOCK_LIBRARY_COPPER_LORE.getStringList(player)).build(), (player, click) -> {
-            if (!pregame(player)) return;
-            Setting.setCopperExtras(!Setting.isCopperExtras());
-            Block.addUpBlocks();
-            refreshMenus();
+            if (!pregame(arena, player)) return;
+            arena.getSettings().setCopperExtras(!arena.getSettings().isCopperExtras());
+            refreshMenus(arena);
         });
     }
 
-    static boolean pregame(Player player) {
-        if (Game.getCurrentGameState() == Game.GameState.PREGAME) return true;
+    static boolean pregame(GameInstance arena, Player player) {
+        if (arena.getState() == RoomState.WAITING) return true;
         player.closeInventory();
         return false;
     }
 
-    static void refreshMenus() {
-        Gui.updateMenu(new DifficultyMenu());
-        Gui.updateMenu(new PreGameMenu());
-        Gui.updateMenu(new CustomBlockMenu());
+    static void refreshMenus(GameInstance arena) {
+        Gui.updateMenu(new DifficultyMenu(arena));
+        Gui.updateMenu(new PreGameMenu(arena));
+        Gui.updateMenu(new CustomBlockMenu(arena));
         top.lqsnow.blockracing.toolkit.menu.MenuManager.refreshOpenMenus(CustomTierMenu.class);
         Scoreboard.updateScoreboard();
     }
 
     private ItemStack presetItem(DifficultyPreset.Kind kind, Player player) {
-        DifficultyPreset preset = Block.preset(kind);
-        boolean selected = Setting.getDifficulty() == kind;
+        DifficultyPreset preset = Block.preset(kind, arena.getSettings());
+        boolean selected = arena.getSettings().getDifficulty() == kind;
         List<String> described = new ArrayList<>();
         described.addFirst(Message.valueOf("BLOCK_LIBRARY_" + kind.name() + "_DESCRIPTION").getString(player));
         described.add(Message.BLOCK_LIBRARY_EXAMPLES.getString(player).replace("%blocks%", examples(kind, player)));
@@ -105,7 +112,7 @@ public final class DifficultyMenu extends MenuView {
         return Message.valueOf("BLOCK_LIBRARY_" + dimension.name());
     }
 
-    private static String examples(DifficultyPreset.Kind kind, Player player) {
+    private String examples(DifficultyPreset.Kind kind, Player player) {
         List<String> preferred = switch (kind) {
             case CASUAL, EASY -> List.of("dirt", "cobblestone", "glass", "furnace");
             case NORMAL -> List.of("cherry_log", "cake", "beehive", "netherrack");
@@ -113,7 +120,7 @@ public final class DifficultyMenu extends MenuView {
             case NIGHTMARE -> List.of("dragon_head", "netherite_block", "beacon", "copper_golem_statue");
             case CUSTOM -> List.of();
         };
-        java.util.Set<String> available = Block.candidates(kind, Setting.isCopperExtras()).stream()
+        java.util.Set<String> available = Block.candidates(kind, arena.getSettings().isCopperExtras()).stream()
                 .map(top.lqsnow.blockracing.pools.PoolEntry::id).collect(java.util.stream.Collectors.toSet());
         List<String> examples = new ArrayList<>();
         for (String id : preferred) if (available.contains("minecraft:" + id)) examples.add("minecraft:" + id);

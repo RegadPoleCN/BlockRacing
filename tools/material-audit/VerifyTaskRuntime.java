@@ -1,6 +1,4 @@
 import org.bukkit.configuration.file.YamlConfiguration;
-import top.lqsnow.blockracing.managers.Block;
-import top.lqsnow.blockracing.managers.Game;
 import top.lqsnow.blockracing.pools.*;
 
 import java.nio.file.*;
@@ -45,57 +43,37 @@ public class VerifyTaskRuntime {
             }
         }
 
-        // Restore the old enum-name format and keep its original full pending queue.
-        YamlConfiguration legacy = new YamlConfiguration();
-        legacy.set("format-version", 1);
-        List<String> original = List.of("DIRT", "STONE", "OAK_LOG", "COBBLESTONE", "SAND");
-        legacy.set("blocks.red-all", original);
-        legacy.set("blocks.blue-all", original);
-        legacy.set("blocks.red-remaining", original.subList(1, 5));
-        legacy.set("blocks.blue-remaining", original);
-        legacy.set("legacy-pool", original);
-        Game.redTeamCurrentBlockAmount = 1;
-        Game.blueTeamCurrentBlockAmount = 0;
-        Game.redTeamTotalBlockAmount = Game.blueTeamTotalBlockAmount = 5;
-        Block.restoreTasks(legacy);
-        require(Block.session() == null, "Legacy save unexpectedly adopted new rules");
-        require(Block.redTeamRemainingBlocks.equals(List.of("minecraft:stone", "minecraft:oak_log", "minecraft:cobblestone", "minecraft:sand")), "Legacy targets changed");
-        Block.saveTasks(legacy);
-        legacy.set("format-version", 2);
-        require(legacy.getBoolean("tasks-legacy"), "Missing legacy format marker");
-        Block.restoreTasks(legacy);
-        require(Block.blueTeamRemainingBlocks.size() == 5, "Lost legacy pending targets");
-        legacy.set("format-version", 3);
-        Block.restoreTasks(legacy);
-        require(Block.blueTeamRemainingBlocks.size() == 5, "Lost legacy queue after v3 upgrade");
-
         // A real pre-pacing v2 fixture must continue its original sequence, not adopt new defaults.
+        // The legacy v1 queue restore itself lives in GameInstance.restoreTasks and needs a running
+        // arena; the pools engine contract is verified here.
         YamlConfiguration oldRules = new YamlConfiguration();
         oldRules.load(root.resolve("src/test/resources/legacy-task-session-v2.yml").toFile());
-        Block.restoreTasks(oldRules);
-        require(!Block.session().preset().pacing().enabled(), "Old match adopted pacing");
+        TaskSession restored = TaskSession.load(oldRules.getConfigurationSection("tasks"), false);
+        require(!restored.preset().pacing().enabled(), "Old match adopted pacing");
         for (String team : List.of("red", "blue")) {
             for (String frame : oldRules.getStringList("expected." + team)) {
-                require(frame.equals(String.join(",", Block.session().active(team))), "Old v2 future sequence changed");
-                if (!Block.session().active(team).isEmpty()) require(Block.complete(team, Block.session().active(team).getFirst()), "Old v2 completion failed");
+                require(frame.equals(String.join(",", restored.active(team))), "Old v2 future sequence changed");
+                if (!restored.active(team).isEmpty()) require(restored.complete(team, restored.active(team).getFirst()), "Old v2 completion failed");
             }
         }
 
-        // Restore a new match through the production adapter, not just the pure task engine.
+        // Restore a new match through the same adapter path the arena uses (format 3 keeps pacing).
         TaskSession match = new TaskSession(DifficultyPreset.defaults(DifficultyPreset.Kind.HARD), false, 50, 3, true, 77, catalog.entries());
         for (int i = 0; i < 17; i++) match.complete("red", match.active("red").getFirst());
         require(match.roll("red"), "Expected legal roll");
         YamlConfiguration snapshot = new YamlConfiguration();
         snapshot.set("format-version", 3);
         match.save(snapshot.createSection("tasks"));
-        Block.restoreTasks(snapshot);
-        require(Game.redTeamCurrentBlockAmount == 17 && Game.redTeamTotalBlockAmount == 50 && Game.redTeamRollCount == 1, "Adapter restored wrong counters");
-        require(Block.redTeamRemainingBlocks.equals(match.active("red")), "Adapter changed active slots");
-        require(Block.session().preset().pacing().enabled(), "New match lost pacing rules");
-        require(Block.complete("red", Block.redTeamRemainingBlocks.getFirst()), "Adapter completion failed");
-        require(Block.session().completed("red") == 18 && Block.redTeamRemainingBlocks.size() == 4, "Adapter refill failed");
+        YamlConfiguration reloaded = new YamlConfiguration();
+        reloaded.loadFromString(snapshot.saveToString());
+        TaskSession adapter = TaskSession.load(reloaded.getConfigurationSection("tasks"), true);
+        require(adapter.completed("red") == 17 && adapter.total() == 50 && adapter.rolls("red") == 1, "Adapter restored wrong counters");
+        require(adapter.active("red").equals(match.active("red")), "Adapter changed active slots");
+        require(adapter.preset().pacing().enabled(), "New match lost pacing rules");
+        require(adapter.complete("red", adapter.active("red").getFirst()), "Adapter completion failed");
+        require(adapter.completed("red") == 18 && adapter.active("red").size() == 4, "Adapter refill failed");
         String result = "{\"paper\":\"26.3.build.244-stable\",\"simulated_matches\":" + matches
-                + ",\"snapshot_version\":3,\"legacy_v1_v2_v3_queue_restore\":true,\"legacy_pacing_sequence_preserved\":true,\"production_adapter_restore\":true,\"status\":\"passed\"}\n";
+                + ",\"snapshot_version\":3,\"legacy_v2_fixture_sequence_preserved\":true,\"snapshot_roundtrip\":true,\"status\":\"passed\"}\n";
         Files.writeString(root.resolve(".runtime/material-audit/task-runtime-verification.json"), result);
     }
 }

@@ -3,6 +3,7 @@ package top.lqsnow.blockracing.menus;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.managers.Block;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.pools.PoolEntry.Dimension;
@@ -13,9 +14,12 @@ import top.lqsnow.blockracing.utils.TranslationUtil;
 import top.lqsnow.blockracing.managers.LanguageManager;
 
 public final class CustomTierMenu extends MenuView {
-    public CustomTierMenu(Dimension dimension) {
+    private final GameInstance arena;
+
+    public CustomTierMenu(Dimension dimension, GameInstance arena) {
         super(27, player -> Message.CUSTOM_DETAILS.getString(player)
                 .replace("%dimension%", DifficultyMenu.dimensionName(dimension).getString(player)));
+        this.arena = arena;
         for (int tier = 1; tier <= 6; tier++) {
             int selectedTier = tier;
             setButton(9 + tier, MenuButton.of(player -> ItemBuilder.of(Block.customSettings().tierEnabled(dimension, selectedTier)
@@ -23,18 +27,18 @@ public final class CustomTierMenu extends MenuView {
                     .name("T" + selectedTier + "：" + (Block.customSettings().tierEnabled(dimension, selectedTier)
                             ? Message.MENU_ENABLED : Message.MENU_DISABLED).getString(player))
                     .lore(tierLore(dimension, selectedTier, player)).build(), (player, click) -> {
-                if (!DifficultyMenu.pregame(player)) return;
-                CustomBlockMenu.edit(player, () -> Block.saveCustomSettings(Block.customSettings().toggleTier(dimension, selectedTier)));
+                if (!DifficultyMenu.pregame(arena, player)) return;
+                CustomBlockMenu.edit(player, arena, () -> Block.saveCustomSettings(Block.customSettings().toggleTier(dimension, selectedTier)));
             }));
         }
         setButton(18, MenuButton.of(player -> ItemBuilder.of(Material.ARROW)
                 .name(Message.CUSTOM_TITLE.getString(player)).build(), (player, click) -> {
-            if (DifficultyMenu.pregame(player)) new CustomBlockMenu().open(player);
+            if (DifficultyMenu.pregame(arena, player)) new CustomBlockMenu(arena).open(player);
         }));
     }
 
-    private static java.util.List<String> tierLore(Dimension dimension, int tier, Player player) {
-        var summary = Block.tierSummary(dimension, tier);
+    private java.util.List<String> tierLore(Dimension dimension, int tier, Player player) {
+        var summary = Block.tierSummary(dimension, tier, arena.getSettings().isCopperExtras());
         String examples = summary.examples().isEmpty() ? Message.CUSTOM_EMPTY_TIER.getString(player)
                 : summary.examples().stream().map(id -> TranslationUtil.getValue(id, player))
                 .collect(java.util.stream.Collectors.joining(LanguageManager.usesChinese(player) ? "、" : ", "));

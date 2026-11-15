@@ -88,8 +88,8 @@ public class Main extends JavaPlugin {
         GameManager.init();
         GameManager.get().createGame();
         Scoreboard.createScoreboard();
-        GameManager.first().validateBlocks();
-        GameManager.first().refreshAvailableBlocksAndClampAmount();
+        new Block();
+        Block.checkBlock();
         boolean recoveredGame = InstanceProgressStore.load(GameManager.first());
         if (recoveredGame) {
             GameManager.first().resumeRecovered();

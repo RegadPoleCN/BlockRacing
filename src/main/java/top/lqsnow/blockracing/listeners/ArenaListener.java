@@ -17,6 +17,7 @@ import top.lqsnow.blockracing.Main;
 import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.core.RoomState;
+import top.lqsnow.blockracing.managers.Block;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
 import top.lqsnow.blockracing.managers.TeamChat;
@@ -127,8 +128,13 @@ public class ArenaListener implements Listener {
 
     public static void setBlockAmount(Player player, int blockAmount, Boolean sendMessage) {
         GameInstance arena = GameManager.get().sessions().arenaOf(player).orElse(GameManager.first());
-        blockAmount = top.lqsnow.blockracing.game.BlockCatalog.clampBlockAmount(blockAmount,
-                arena.getCatalog().maxBlockAmount(arena.getSettings()));
+        int capacity = Block.capacityFor(arena.getSettings());
+        if (blockAmount < 10 || blockAmount > capacity) {
+            // Capacity problems are reported instead of silently reducing the requested game length.
+            arena.broadcast().all(Message.BLOCK_LIBRARY_AMOUNT_ERROR,
+                    (viewer, text) -> text.replace("%capacity%", String.valueOf(capacity)));
+            return;
+        }
         if (sendMessage) {
             int finalBlockAmount = blockAmount;
             arena.broadcast().all(Message.NOTICE_SET_BLOCKS_SUCCESS,

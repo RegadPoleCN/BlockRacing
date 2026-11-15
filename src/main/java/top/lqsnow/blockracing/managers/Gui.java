@@ -21,7 +21,7 @@ public class Gui {
             new GameSelectorMenu().open(player);
             return;
         }
-        if (arena.get().getState() == RoomState.RUNNING && MenuMemory.reopen(player)) return;
+        if (arena.get().getState() == RoomState.RUNNING && MenuMemory.reopen(player, arena.get())) return;
         openMainMenu(player);
     }
 
@@ -61,7 +61,7 @@ public class Gui {
         player.getOpenInventory().setTitle(color == TeamColor.RED
                 ? Message.MENU_RED_CHEST.getString(player) + (index + 1)
                 : Message.MENU_BLUE_CHEST.getString(player) + (index + 1));
-        MenuMemory.recordChest(player, index);
+        MenuMemory.recordChest(player, arena.get(), index);
     }
 
     // Update menu

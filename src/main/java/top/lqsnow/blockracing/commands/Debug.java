@@ -10,11 +10,11 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import top.lqsnow.blockracing.Main;
 import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.core.RoomState;
 import top.lqsnow.blockracing.core.TeamColor;
+import top.lqsnow.blockracing.managers.Block;
 import top.lqsnow.blockracing.managers.LanguageManager;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
@@ -49,7 +49,7 @@ public class Debug implements CommandExecutor, TabCompleter {
             LanguageManager.load();
             Scoreboard.syncPlayerTeams();
             if (arena.getState() == RoomState.WAITING) {
-                arena.getCatalog().reload(Main.getInstance().getDataFolder());
+                Block.reloadBlock();
             }
             updateScoreboard();
         }
