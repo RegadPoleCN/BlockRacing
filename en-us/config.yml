@@ -4,7 +4,11 @@
 # While the server is running, change these options through the in-game menu.
 # Player languages are selected independently with /language and are not configured here.
 
-# Optional block pools in addition to the required easy pool
+# Legacy options retained only for recovery of old matches
+# Standard preset: casual / easy / normal / hard / nightmare / custom; copper variants default off
+difficulty: normal
+copper-extras: false
+
 medium-block: false
 hard-block: false
 dyed-block: false
@@ -22,7 +26,7 @@ game-mode: normal
 
 # Speed mode:
 # Gives players additional starting items and effects. Each collected block is
-# worth 3 points instead of 1.
+# worth 3/4/5/6 points for Easy/Medium/Hard/Nightmare (normally 1/2/3/4).
 # Items: Silk Touch iron pickaxe, cooked beef, damaged elytra and Mending book
 # Effect: Haste V
 speed-mode: false
@@ -67,4 +71,8 @@ lobby:
   world: "lobby"
 
 # Internal compatibility value. Do not edit this manually.
-config-version: 26.2.1
+config-version: 26.3.0
+
+# Check GitHub stable releases at startup and every 6 hours; only notify about newer versions.
+# Connection failures and up-to-date results are silent. No automatic downloads.
+check-updates: true

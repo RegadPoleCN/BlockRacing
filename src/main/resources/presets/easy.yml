@@ -1,0 +1,32 @@
+# Dimension order: OVERWORLD, NETHER, END. Ranges are fixed for standard presets.
+# Thresholds use ceil(total * percent / 100) completed tasks at actual refill.
+id: easy
+max-tiers: [2, 2, 0]
+unlock-percent: [0, 50, 100]
+tier-weights: [45, 55, 0, 0, 0, 0]
+dimension-weights: [70, 30, 25]
+# Category order: GATHER, CRAFT, EXPLORE. Positive weights only; no category bans.
+pacing:
+  enabled: true
+  middle-start-percent: 20
+  late-start-percent: 80
+  category-weights:
+    early: [45, 40, 15]
+    middle: [25, 30, 45]
+    late: [30, 40, 30]
+
+# Progress uses completed goals, not generated queue positions. Order is T1 through T6.
+# Zero blocks a tier; positive values multiply the preset's base tier weights.
+tier-progression:
+  enabled: true
+  stages:
+    - start-percent: 0
+      tier-multipliers: [8, 3, 0, 0, 0, 0]
+    - start-percent: 15
+      tier-multipliers: [4, 4, 1, 0, 0, 0]
+    - start-percent: 35
+      tier-multipliers: [2, 3, 4, 1, 0, 0]
+    - start-percent: 60
+      tier-multipliers: [1, 2, 4, 3, 1, 0]
+    - start-percent: 80
+      tier-multipliers: [1, 1, 2, 4, 4, 2]

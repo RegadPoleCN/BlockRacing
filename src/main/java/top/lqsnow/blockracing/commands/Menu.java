@@ -42,8 +42,12 @@ public class Menu implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (args.length == 0 || (args.length == 1 && args[0].equalsIgnoreCase("main"))) {
+        if (args.length == 0) {
             Gui.openMenu(player);
+            return true;
+        }
+        if (args.length == 1 && args[0].equalsIgnoreCase("main")) {
+            Gui.openMainMenu(player);
             return true;
         }
 

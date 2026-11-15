@@ -1,9 +1,19 @@
 name: BlockRacing
-version: 26.2.1
+version: 26.3.0
 main: top.lqsnow.blockracing.Main
-api-version: '26.2'
+api-version: '26.3'
 authors: [ LQ_Snow, xiaojiuwo233, FHSHKL ]
 description: The first team to collect the required blocks wins
+permissions:
+  blockracing.update-notify:
+    description: Receive notifications about newer official BlockRacing releases.
+    default: op
+  blockracing.user:
+    default: true
+  blockracing.admin:
+    default: op
+    children:
+      blockracing.user: true
 commands:
   tp:
     usage: "/tp <Teammate>"
@@ -46,10 +56,3 @@ commands:
     aliases: [lang]
     usage: "/language [auto|zh_cn|en_us]"
     description: "Select your display language."
-permissions:
-  blockracing.user:
-    default: true
-  blockracing.admin:
-    default: op
-    children:
-      blockracing.user: true

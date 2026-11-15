@@ -7,6 +7,7 @@ import org.bukkit.inventory.ItemStack;
 import top.lqsnow.blockracing.commands.RandomTeam;
 import top.lqsnow.blockracing.core.GameInstance;
 import top.lqsnow.blockracing.core.GameManager;
+import top.lqsnow.blockracing.core.RoomState;
 import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.game.GameModeType;
 import top.lqsnow.blockracing.game.RoomSettings;
@@ -25,7 +26,6 @@ public final class PreGameMenu extends MenuView {
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 26, 27, 35, 36, 44,
             45, 46, 47, 48, 49, 50, 51, 52, 53
     );
-    private static final Set<Integer> BLUE_BACKGROUND = Set.of(13, 14, 15, 31, 32, 40, 41, 42);
 
     private final GameInstance arena;
 
@@ -42,26 +42,14 @@ public final class PreGameMenu extends MenuView {
                 player -> item(Material.BLUE_WOOL, Message.MENU_JOIN_BLUE.getString(player)),
                 (player, click) -> arena.joinTeam(player, TeamColor.BLUE)
         ));
-        setButton(20, toggleButton(
-                settings::isEnableMediumBlock,
-                settings::toggleMediumBlock,
-                Message.MENU_MEDIUM_BLOCKS
-        ));
-        setButton(21, toggleButton(
-                settings::isEnableHardBlock,
-                settings::toggleHardBlock,
-                Message.MENU_HARD_BLOCKS
-        ));
-        setButton(22, toggleButton(
-                settings::isEnableDyedBlock,
-                settings::toggleDyedBlock,
-                Message.MENU_DYED_BLOCKS
-        ));
-        setButton(23, toggleButton(
-                settings::isEnableEndBlock,
-                settings::toggleEndBlock,
-                Message.MENU_END_BLOCKS
-        ));
+        setButton(20, MenuButton.of(player -> ItemBuilder.of(Material.BOOK)
+                .name(Message.BLOCK_LIBRARY_TITLE.getString(player) + ": "
+                        + DifficultyMenu.name(settings.getDifficulty()).getString(player))
+                .lore(Message.BLOCK_LIBRARY_CONFIGURE.getStringList(player)).build(),
+                (player, click) -> {
+                    if (arena.getState() == RoomState.WAITING) new DifficultyMenu(arena).open(player);
+                }));
+        setButton(22, DifficultyMenu.copperButton(arena));
         setButton(24, MenuButton.of(
                 player -> ItemBuilder.of(Material.NAME_TAG)
                         .name(Message.MENU_BLOCK_AMOUNT.getString(player) + settings.getBlockAmount())
@@ -107,7 +95,7 @@ public final class PreGameMenu extends MenuView {
                         .build(),
                 (player, click) -> arena.checkStartDemands(player)
         ));
-        setButton(41, MenuButton.of(
+        setButton(15, MenuButton.of(
                 player -> ItemBuilder.of(Material.PLAYER_HEAD)
                         .name(Message.MENU_RANDOM_TEAM.getString(player))
                         .lore(Message.MENU_RANDOM_TEAM_LORE.getStringList(player))
@@ -133,9 +121,6 @@ public final class PreGameMenu extends MenuView {
         if (GREEN_BACKGROUND.contains(slot)) {
             return item(Material.LIME_STAINED_GLASS_PANE, " ");
         }
-        if (BLUE_BACKGROUND.contains(slot)) {
-            return item(Material.LIGHT_BLUE_STAINED_GLASS_PANE, " ");
-        }
         if (slot == 10 || slot == 16) {
             return item(Material.YELLOW_STAINED_GLASS_PANE, Message.MENU_SELECT_TEAM.getString(player));
         }
@@ -149,22 +134,6 @@ public final class PreGameMenu extends MenuView {
             return item(Material.YELLOW_STAINED_GLASS_PANE, Message.MENU_READY_AND_START.getString(player));
         }
         return null;
-    }
-
-    private MenuButton toggleButton(java.util.function.BooleanSupplier enabled, Runnable toggle, Message label) {
-        return MenuButton.of(
-                player -> item(
-                        enabled.getAsBoolean() ? Material.GREEN_CONCRETE : Material.RED_CONCRETE,
-                        label.getString(player) + (enabled.getAsBoolean()
-                                ? Message.MENU_ENABLED.getString(player)
-                                : Message.MENU_DISABLED.getString(player))
-                ),
-                (player, click) -> {
-                    toggle.run();
-                    arena.refreshAvailableBlocksAndClampAmount();
-                    refreshSettings();
-                }
-        );
     }
 
     private ItemStack normalModeItem(Player player) {

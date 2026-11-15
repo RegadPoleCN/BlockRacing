@@ -43,24 +43,7 @@ public final class Scoreboard {
     }
 
     public static String getBlockDisplay(String block, Player player) {
-        top.lqsnow.blockracing.game.BlockCatalog catalog =
-                top.lqsnow.blockracing.core.GameManager.first().getCatalog();
-        Message difficulty;
-        if (catalog.getEasyBlocks().contains(block)) {
-            difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_EASY;
-        } else if (catalog.getMediumBlocks().contains(block)) {
-            difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_MEDIUM;
-        } else if (catalog.getHardBlocks().contains(block)) {
-            difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_HARD;
-        } else if (catalog.getDyedBlocks().contains(block)) {
-            difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_DYED;
-        } else if (catalog.getEndBlocks().contains(block)) {
-            difficulty = Message.SCOREBOARD_BLOCK_DIFFICULTY_END;
-        } else {
-            return null;
-        }
-
-        String difficultyText = text(difficulty, player).stripTrailing();
+        String difficultyText = text(Message.valueOf("SCOREBOARD_BLOCK_DIFFICULTY_" + Block.displayDifficulty(block).name()), player);
         String blockFormat = text(Message.SCOREBOARD_BLOCK_FORMAT, player);
         if (blockFormat.equals("%difficulty% | %block%")) {
             blockFormat = "§8[%difficulty%§8] §f%block%";
@@ -158,14 +141,10 @@ public final class Scoreboard {
                 ? text(Message.SCOREBOARD_MODE_NORMAL, player)
                 : text(Message.SCOREBOARD_MODE_RACING, player);
         String displayedGameMode = settings.isSpeedMode()
-                ? baseMode + " + " + text(Message.SCOREBOARD_MODE_SPEED, player)
+                ? baseMode + " §f+ " + text(Message.SCOREBOARD_MODE_SPEED, player)
                 : baseMode;
 
-        String blocks = text(Message.SCOREBOARD_BLOCKS_EASY, player)
-                + (settings.isEnableMediumBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_MEDIUM, player) : "")
-                + (settings.isEnableHardBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_HARD, player) : "")
-                + (settings.isEnableDyedBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_DYED, player) : "")
-                + (settings.isEnableEndBlock() ? " " + text(Message.SCOREBOARD_BLOCKS_END, player) : "");
+        String blocks = text(top.lqsnow.blockracing.menus.DifficultyMenu.name(settings.getDifficulty()), player);
 
         setTitle(objective, text(Message.SCOREBOARD_PREGAME_TITLE, player));
         Map<Integer, String> lines = new HashMap<>();
@@ -179,12 +158,15 @@ public final class Scoreboard {
             if (originalMessage.isEmpty()) {
                 continue;
             }
-            lines.put(slot, originalMessage
-                    .replace("%game_mode%", displayedGameMode)
-                    .replace("%block_amount%", String.valueOf(settings.getBlockAmount()))
-                    .replace("%blocks%", blocks));
+            lines.put(slot, originalMessage);
         }
-        lines.forEach((slot, line) -> setSlot(board, objective, slot, line));
+        List<String> ordered = lines.entrySet().stream().sorted(Map.Entry.<Integer, String>comparingByKey().reversed())
+                .map(Map.Entry::getValue).toList();
+        List<String> merged = top.lqsnow.blockracing.toolkit.text.PregameLines.mergeDifficulty(ordered);
+        for (int index = 0; index < merged.size(); index++) setSlot(board, objective, merged.size() - index, merged.get(index)
+                .replace("%game_mode%", displayedGameMode)
+                .replace("%block_amount%", String.valueOf(settings.getBlockAmount()))
+                .replace("%blocks%", blocks));
     }
 
     private static void renderInGame(org.bukkit.scoreboard.Scoreboard board,
