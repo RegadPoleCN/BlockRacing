@@ -17,6 +17,7 @@ import static org.bukkit.Bukkit.getPluginManager;
 
 public class Main extends JavaPlugin {
     private static Main instance;
+    private boolean initialized;
 
     public static Main getInstance() {
         return instance;
@@ -34,6 +35,7 @@ public class Main extends JavaPlugin {
         getPluginManager().registerEvents(new ArenaListener(), this);
         getPluginManager().registerEvents(new MenuListener(), this);
         getPluginManager().registerEvents(new top.lqsnow.blockracing.lobby.LobbyListener(), this);
+        getPluginManager().registerEvents(new TeamChestNavigation(), this);
 
         // Register commands
         getPluginCommand("debug").setExecutor(new Debug());
@@ -77,12 +79,17 @@ public class Main extends JavaPlugin {
         Message.saveDefaultConfig();
         Message.load();
         LanguageManager.load();
+        MenuMemory.load();
+        if (!getVersion().equals(Config.CONFIG_VERSION.getString()) || !getVersion().equals(Message.MESSAGE_VERSION.getString())
+                || LanguageManager.hasOutdatedLanguageFiles()) {
+            getLogger().warning("Configuration version mismatch. Stop the server, back up plugins/BlockRacing (including unfinished matches and custom files), delete that folder, and restart to regenerate it. Review old custom settings before restoring them; do not copy old config/lang files back wholesale.");
+        }
         ArenaWorldService.init();
         GameManager.init();
         GameManager.get().createGame();
         Scoreboard.createScoreboard();
-        GameManager.first().validateBlocks();
-        GameManager.first().refreshAvailableBlocksAndClampAmount();
+        new Block();
+        Block.checkBlock();
         boolean recoveredGame = InstanceProgressStore.load(GameManager.first());
         if (recoveredGame) {
             GameManager.first().resumeRecovered();
@@ -97,11 +104,15 @@ public class Main extends JavaPlugin {
         top.lqsnow.blockracing.lobby.Lobby.init(GameManager.get().sessions());
 
         // Complete
+        initialized = true;
+        new top.lqsnow.blockracing.updates.UpdateChecker(this).start();
         Bukkit.getLogger().info("[BlockRacing] Load Complete!");
     }
 
     @Override
     public void onDisable() {
+        // A malformed new preset/catalogue must not delete a valid match that was never loaded.
+        if (!initialized) return;
         boolean anyRunning = GameManager.get().all().stream()
                 .anyMatch(arena -> arena.getState() == RoomState.RUNNING);
         if (anyRunning) {

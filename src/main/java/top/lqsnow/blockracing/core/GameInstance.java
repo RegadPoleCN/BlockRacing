@@ -2,9 +2,11 @@ package top.lqsnow.blockracing.core;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -24,6 +26,7 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
@@ -42,16 +45,22 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import top.lqsnow.blockracing.Main;
-import top.lqsnow.blockracing.game.BlockCatalog;
 import top.lqsnow.blockracing.game.BlockState;
 import top.lqsnow.blockracing.game.RandomTeleportService;
 import top.lqsnow.blockracing.game.RoomSettings;
 import top.lqsnow.blockracing.game.TeamState;
+import top.lqsnow.blockracing.managers.Block;
 import top.lqsnow.blockracing.managers.Config;
 import top.lqsnow.blockracing.game.GameModeType;
 import top.lqsnow.blockracing.game.InstanceProgressStore;
+import top.lqsnow.blockracing.managers.Gui;
 import top.lqsnow.blockracing.managers.Message;
+import top.lqsnow.blockracing.menus.GameMenu;
 import top.lqsnow.blockracing.managers.Scoreboard;
+import top.lqsnow.blockracing.managers.TeamChestNavigation;
+import top.lqsnow.blockracing.pools.DisplayDifficulty;
+import top.lqsnow.blockracing.pools.PoolEntry;
+import top.lqsnow.blockracing.pools.TaskSession;
 import top.lqsnow.blockracing.session.SessionManager;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
 import top.lqsnow.blockracing.toolkit.material.Materials;
@@ -67,7 +76,6 @@ public class GameInstance {
     private final SessionManager sessions;
     private final GameBroadcast broadcast;
     private final RoomSettings settings;
-    private final BlockCatalog catalog;
     private final TeamState teams = new TeamState();
     private final BlockState blockState = new BlockState();
 
@@ -103,12 +111,15 @@ public class GameInstance {
     private World world;
     private long startedAt;
 
+    // Per-arena block session and its legacy-save fallback pool.
+    private TaskSession session;
+    private List<String> legacyPool = List.of();
+
     public GameInstance(int id, SessionManager sessions, RoomSettings settings) {
         this.id = id;
         this.sessions = sessions;
         this.broadcast = new GameBroadcast(this, sessions);
         this.settings = settings;
-        this.catalog = BlockCatalog.load(Main.getInstance().getDataFolder());
         initChests();
         startWaitingEffects();
     }
@@ -287,7 +298,7 @@ public class GameInstance {
         }
     }
 
-    /** min-players, everyone ready, both teams filled and valid blocks. */
+    /** min-players, everyone ready, both teams filled. */
     private boolean startConditionsMet() {
         int online = arenaPlayers().size();
         if (online < Math.max(1, Config.MIN_PLAYERS.getInt())) {
@@ -296,7 +307,7 @@ public class GameInstance {
         if (readyPlayers.isEmpty() || readyPlayers.size() != online) {
             return false;
         }
-        if (teams.hasEmptyTeam() || !validateBlocks()) {
+        if (teams.hasEmptyTeam()) {
             return false;
         }
         return true;
@@ -350,11 +361,6 @@ public class GameInstance {
             return;
         }
 
-        // Blocks have problems
-        if (!validateBlocks()) {
-            return;
-        }
-
         // Start the game
         broadcast.all(Message.NOTICE_START);
         start();
@@ -362,16 +368,16 @@ public class GameInstance {
 
     public void start() {
         // Init
+        setupBlocks();
         state = RoomState.RUNNING;
         startedAt = System.currentTimeMillis();
         arenaPlayers().forEach(Player::closeInventory);
         sessions.getEditAmountPlayers().clear();
-        blockState.setup(settings, catalog, new Random());
         Bukkit.getLogger().info("[BlockRacing] Blocks generate complete.");
         Bukkit.getLogger().info("Red team blocks: " + blockState.all(TeamColor.RED));
         Bukkit.getLogger().info("Blue team blocks: " + blockState.all(TeamColor.BLUE));
-        redTotalBlockAmount = blockState.all(TeamColor.RED).size();
-        blueTotalBlockAmount = blockState.all(TeamColor.BLUE).size();
+        setTotalAmount(TeamColor.RED, targetTotal());
+        setTotalAmount(TeamColor.BLUE, targetTotal());
         setLocateCost();
         Scoreboard.updateScoreboard();
         List<Player> starting = arenaPlayers();
@@ -477,7 +483,7 @@ public class GameInstance {
         if (team.isEmpty()) {
             return;
         }
-        if (getRollCount(team.get()) >= settings.getMaxRollCount()) {
+        if (getRollCount(team.get()) >= maxRolls()) {
             player.sendMessage(rollLimitMessage(player));
             return;
         }
@@ -726,13 +732,13 @@ public class GameInstance {
             checkInventories();
 
             // Win check
-            if (blockState.hasFinished(TeamColor.RED)) {
+            if (hasFinished(TeamColor.RED)) {
                 end(TeamColor.RED);
                 showRanking();
                 this.cancel();
                 return;
             }
-            if (blockState.hasFinished(TeamColor.BLUE)) {
+            if (hasFinished(TeamColor.BLUE)) {
                 end(TeamColor.BLUE);
                 showRanking();
                 this.cancel();
@@ -766,16 +772,19 @@ public class GameInstance {
         Set<String> rollSet = new HashSet<>(rollPlayers(team));
         Set<String> onlineSet = new HashSet<>(teams.onlinePlayers(team));
         if (!onlineSet.isEmpty() && rollSet.containsAll(onlineSet)) {
-            List<String> b = new ArrayList<>(catalog.pool(settings));
-            b.removeAll(blockState.all(team));
-            Random random = new Random();
-            int rollAmount = blockState.current(team).size();
-            for (int i = 0; i < rollAmount; i++) {
-                blockState.remaining(team).set(i, b.get(random.nextInt(b.size())));
-            }
-            broadcast.all(team == TeamColor.RED ? Message.NOTICE_RED_ROLL_SUCCESS : Message.NOTICE_BLUE_ROLL_SUCCESS);
-            addRollCount(team);
             rollPlayers(team).clear();
+            Message success = team == TeamColor.RED ? Message.NOTICE_RED_ROLL_SUCCESS : Message.NOTICE_BLUE_ROLL_SUCCESS;
+            if (getRollCount(team) >= maxRolls() || !rollBlock(team)) {
+                for (String name : teams.onlinePlayers(team)) {
+                    Player player = Bukkit.getPlayerExact(name);
+                    if (player != null)
+                        player.sendMessage(Message.BLOCK_LIBRARY_ROLL_FAILED.getString(player));
+                }
+                return;
+            }
+            addRollCount(team);
+            Gui.updateMenu(new GameMenu(this));
+            broadcast.all(success);
             Scoreboard.updateScoreboard();
             InstanceProgressStore.saveNow(this);
         }
@@ -802,7 +811,7 @@ public class GameInstance {
                     Player p = Bukkit.getPlayer(player);
                     if (p == null)
                         continue;
-                    if (p.getInventory().contains(Material.valueOf(block))) {
+                    if (p.getInventory().contains(Materials.require(block))) {
                         collectBlock(team, block, player);
                         return;
                     }
@@ -811,7 +820,7 @@ public class GameInstance {
             // Complete from team chest
             for (String block : blockState.current(team)) {
                 for (Inventory chest : chests(team)) {
-                    if (chest.contains(Material.valueOf(block))) {
+                    if (TeamChestNavigation.contains(chest, Materials.require(block))) {
                         collectBlock(team, block, teamChestLabel(team).getString());
                         return;
                     }
@@ -821,6 +830,9 @@ public class GameInstance {
     }
 
     public void collectBlock(TeamColor team, String block, String player) {
+        if (!completeBlock(team, block)) {
+            return;
+        }
         boolean collectedFromTeamChest = player.equals(teamChestLabel(team).getString());
         Message collectNotice = team == TeamColor.RED ? Message.NOTICE_RED_COLLECT : Message.NOTICE_BLUE_COLLECT;
         broadcast.all(collectNotice, (viewer, text) -> text
@@ -831,11 +843,7 @@ public class GameInstance {
         Bukkit.getLogger().info(collectNotice.getString()
                 .replace("%block%", TranslationUtil.getValue(block)).replace("%player%", player).replaceAll("§.", ""));
         broadcast.sound(Sound.ENTITY_EXPERIENCE_ORB_PICKUP);
-        blockState.complete(team, block);
-        if (settings.isSpeedMode())
-            addScore(team, 3);
-        else
-            addScore(team, 1);
+        addScore(team, displayDifficulty(block).points(settings.isSpeedMode()));
         if (team == TeamColor.RED)
             redCurrentBlockAmount += 1;
         else
@@ -945,32 +953,174 @@ public class GameInstance {
         }
     }
 
-    /** Clamps the room's target amount to the currently available pool. */
-    public boolean refreshAvailableBlocksAndClampAmount() {
-        int clamped = BlockCatalog.clampBlockAmount(settings.getBlockAmount(), catalog.maxBlockAmount(settings));
-        if (clamped == settings.getBlockAmount()) {
+    // ------------------------------------------------------------------
+    // Block session engine (per-arena port of the former static Block facade)
+    // ------------------------------------------------------------------
+
+    public TaskSession session() {
+        return session;
+    }
+
+    /** The room's target total; the session total once one exists. */
+    public int targetTotal() {
+        return session == null ? settings.getBlockAmount() : session.total();
+    }
+
+    public int maxRolls() {
+        return session == null ? settings.getMaxRollCount() : session.maxRolls();
+    }
+
+    public int rollsRemaining(TeamColor team) {
+        return session == null ? Math.max(0, maxRolls() - getRollCount(team))
+                : session.rollsRemaining(team.name().toLowerCase(Locale.ROOT));
+    }
+
+    public PoolEntry find(String id) {
+        String key = Materials.require(id).getKey().toString();
+        PoolEntry saved = session == null ? null : session.find(key);
+        return saved != null ? saved : Block.find(key);
+    }
+
+    public DisplayDifficulty displayDifficulty(String id) {
+        PoolEntry entry = find(id);
+        return entry == null ? DisplayDifficulty.EASY : DisplayDifficulty.forTier(entry.tier());
+    }
+
+    /** A team finishes when its collected count reaches the match total. */
+    private boolean hasFinished(TeamColor team) {
+        int total = getTotalAmount(team);
+        return total > 0 && getCurrentAmount(team) >= total;
+    }
+
+    /** Generates a fresh per-arena session from the room's difficulty selection. */
+    public void setupBlocks() {
+        session = Block.createSession(settings, new Random().nextLong());
+        legacyPool = List.of();
+        setCurrentAmount(TeamColor.RED, 0);
+        setCurrentAmount(TeamColor.BLUE, 0);
+        setRollCount(TeamColor.RED, 0);
+        setRollCount(TeamColor.BLUE, 0);
+        syncBlocks();
+    }
+
+    /** Mirrors the session lists into the display lists shared with menus and scoreboard. */
+    private void syncBlocks() {
+        if (session == null) {
+            return;
+        }
+        blockState.install(TeamColor.RED, session.seen("red"), session.active("red"));
+        blockState.install(TeamColor.BLUE, session.seen("blue"), session.active("blue"));
+    }
+
+    /** Moves one block from the pending list to the completed set; false if it was not pending. */
+    public boolean completeBlock(TeamColor team, String block) {
+        if (session != null) {
+            boolean success = session.complete(team.name().toLowerCase(Locale.ROOT), block);
+            if (success)
+                syncBlocks();
+            return success;
+        }
+        List<String> remaining = blockState.remaining(team);
+        if (!remaining.subList(0, Math.min(4, remaining.size())).contains(block)) {
             return false;
         }
-        settings.setBlockAmount(clamped);
+        return remaining.remove(block);
+    }
+
+    /** Rolls the team's pending targets; false when out of rolls or no replacements remain. */
+    public boolean rollBlock(TeamColor team) {
+        if (session != null) {
+            boolean success = session.roll(team.name().toLowerCase(Locale.ROOT));
+            if (success)
+                syncBlocks();
+            return success;
+        }
+        List<String> remaining = blockState.remaining(team);
+        List<String> seen = blockState.all(team);
+        List<String> available = new ArrayList<>(legacyPool);
+        available.removeAll(seen);
+        available.removeAll(remaining);
+        int amount = Math.min(4, remaining.size());
+        if (amount == 0 || available.size() < amount) {
+            return false;
+        }
+        Collections.shuffle(available);
+        List<String> replacements = new ArrayList<>(available.subList(0, amount));
+        for (int i = 0; i < amount; i++)
+            remaining.set(i, replacements.get(i));
+        seen.addAll(replacements);
         return true;
     }
 
-    /** Validates the selectable pool for the current settings (original Block.checkBlock). */
-    public boolean validateBlocks() {        boolean flag = true;
-        for (String str : catalog.pool(settings)) {
-            try {
-                Material material = Materials.require(str);
-                if (!material.isItem()) {
-                    throw new IllegalArgumentException("Material cannot be represented as an item: " + str);
-                }
-            } catch (Exception e) {
-                Bukkit.getLogger().severe(String.format("[BlockRacing] " + Message.NOTICE_ERROR_BLOCK.getString(), str));
-                broadcast.all(Message.NOTICE_ERROR_BLOCK,
-                        (viewer, text) -> String.format(text, str));
-                flag = false;
+    /** Writes the session state into a progress snapshot (upstream Block.saveTasks). */
+    public void saveTasks(YamlConfiguration state) {
+        state.set("tasks-legacy", session == null);
+        if (session != null) {
+            session.save(state.createSection("tasks"));
+        } else {
+            state.set("legacy-pool", legacyPool);
+        }
+    }
+
+    /** Restores the session from a progress snapshot (upstream Block.restoreTasks). */
+    public void restoreTasks(YamlConfiguration state) {
+        if (state.getInt("format-version", 1) >= 2 && !state.getBoolean("tasks-legacy")) {
+            TaskSession restored = TaskSession.load(state.getConfigurationSection("tasks"),
+                    state.getInt("format-version") >= 3);
+            top.lqsnow.blockracing.pools.BlockCatalog.validateLive(restored.pool());
+            session = restored;
+            legacyPool = List.of();
+            syncBlocks();
+            setCurrentAmount(TeamColor.RED, session.completed("red"));
+            setCurrentAmount(TeamColor.BLUE, session.completed("blue"));
+            setTotalAmount(TeamColor.RED, session.total());
+            setTotalAmount(TeamColor.BLUE, session.total());
+            setRollCount(TeamColor.RED, session.rolls("red"));
+            setRollCount(TeamColor.BLUE, session.rolls("blue"));
+            return;
+        }
+        // Legacy save (static-list format): keep this match's pending targets;
+        // the new engine applies from the next match on.
+        session = null;
+        blockState.install(TeamColor.RED, canonical(state.getStringList("blocks.red-all")),
+                canonical(state.getStringList("blocks.red-remaining")));
+        blockState.install(TeamColor.BLUE, canonical(state.getStringList("blocks.blue-all")),
+                canonical(state.getStringList("blocks.blue-remaining")));
+        for (TeamColor team : TeamColor.values()) {
+            List<String> remaining = blockState.remaining(team);
+            int completed = getCurrentAmount(team);
+            int total = getTotalAmount(team);
+            if (completed < 0 || total < 1 || completed + remaining.size() != total
+                    || new HashSet<>(remaining).size() != remaining.size()) {
+                throw new IllegalArgumentException("Invalid or duplicate legacy targets for "
+                        + team.name().toLowerCase(Locale.ROOT) + "; save preserved for manual repair");
             }
         }
-        return flag;
+        if (state.contains("legacy-pool")) {
+            legacyPool = canonical(state.getStringList("legacy-pool"));
+        } else {
+            List<String> old = new ArrayList<>(Block.easyBlocks);
+            if (settings.isEnableMediumBlock())
+                old.addAll(Block.mediumBlocks);
+            if (settings.isEnableHardBlock())
+                old.addAll(Block.hardBlocks);
+            if (settings.isEnableDyedBlock())
+                old.addAll(Block.dyedBlocks);
+            if (settings.isEnableEndBlock())
+                old.addAll(Block.endBlocks);
+            legacyPool = old.stream().distinct().toList();
+        }
+        Bukkit.getLogger().warning(
+                "[BlockRacing] Legacy match recovered with its original pending targets; new presets apply next match.");
+    }
+
+    private static List<String> canonical(List<String> ids) {
+        return ids.stream().map(id -> {
+            Material material = Materials.require(id);
+            if (!material.isItem() || material.isAir())
+                throw new IllegalArgumentException("Not a valid item Material: " + id);
+            return material.getKey().toString();
+        }).toList();
     }
 
     public List<String> currentBlocks(TeamColor team) {
@@ -1035,6 +1185,7 @@ public class GameInstance {
 
     public void setState(RoomState state) {
         this.state = state;
+        top.lqsnow.blockracing.managers.MenuMemory.resetDestinations();
     }
 
     public TeamState getTeams() {
@@ -1069,10 +1220,6 @@ public class GameInstance {
 
     public RoomSettings getSettings() {
         return settings;
-    }
-
-    public BlockCatalog getCatalog() {
-        return catalog;
     }
 
     public Set<String> getReadyPlayers() {

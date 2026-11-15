@@ -7,10 +7,8 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
 import top.lqsnow.blockracing.core.GameInstance;
-import top.lqsnow.blockracing.core.GameManager;
 import top.lqsnow.blockracing.core.TeamColor;
 import top.lqsnow.blockracing.game.InstanceProgressStore;
-import top.lqsnow.blockracing.managers.LanguageManager;
 import top.lqsnow.blockracing.managers.Message;
 import top.lqsnow.blockracing.managers.Scoreboard;
 import top.lqsnow.blockracing.toolkit.item.ItemBuilder;
@@ -39,8 +37,7 @@ public final class GameMenu extends MenuView {
         ));
         setButton(12, MenuButton.of(
                 player -> ItemBuilder.of(Material.TOTEM_OF_UNDYING)
-                        .name(Message.MENU_ROLL.getString(player))
-                        .lore(List.of(rollLore(player)))
+                        .name(Message.MENU_ROLL.getString(player) + " " + rollRemaining(player))
                         .build(),
                 (player, click) -> {
                     arena.roll(player);
@@ -112,6 +109,14 @@ public final class GameMenu extends MenuView {
                     }
             ));
         }
+        setButton(35, MenuButton.of(player -> ItemBuilder.of(top.lqsnow.blockracing.managers.MenuMemory.enabled(player)
+                        ? Material.LIME_DYE : Material.GRAY_DYE)
+                .name(Message.MENU_MEMORY.getString(player) + (top.lqsnow.blockracing.managers.MenuMemory.enabled(player)
+                        ? Message.MENU_ENABLED : Message.MENU_DISABLED).getString(player))
+                .lore(Message.MENU_MEMORY_LORE.getStringList(player)).build(), (player, click) -> {
+            top.lqsnow.blockracing.managers.MenuMemory.toggle(player);
+            refresh(player);
+        }));
     }
 
     @Override
@@ -362,14 +367,10 @@ public final class GameMenu extends MenuView {
                 .toList();
     }
 
-    private String rollLore(Player player) {
-        String lore = Message.MENU_ROLL_LORE.getString(player);
-        if (!lore.contains("%count%")) {
-            lore = LanguageManager.usesChinese(player)
-                    ? "§b替换当前目标方块（每局每队最多 %count% 次）"
-                    : "§bReplace current targets (up to %count% times per team)";
-        }
-        return lore.replace("%count%", String.valueOf(arena.getSettings().getMaxRollCount()));
+    private String rollRemaining(Player player) {
+        TeamColor team = arena.getTeams().teamOf(player.getName()).orElse(null);
+        int remaining = team == null ? 0 : arena.rollsRemaining(team);
+        return Message.MENU_ROLL_REMAINING.getString(player).replace("%remaining%", String.valueOf(remaining));
     }
 
     private static List<String> replaceWaypointPlaceholders(List<String> lore, String dimension,
